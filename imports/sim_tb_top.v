@@ -1054,7 +1054,9 @@ module sim_tb_top;
 
       for (i = 0; i < NUM_COMP; i = i + 1) begin: gen_mem
 
-        ddr3_model u_comp_ddr3
+        ddr3_model #(
+          .DEBUG(0)
+        ) u_comp_ddr3
 
           (
 
@@ -1097,409 +1099,534 @@ module sim_tb_top;
     end
 
   endgenerate
-
-    
-
-    
-
-
-
-
-
-
-
-
-
   //***************************************************************************
-
-  // AXI read/write smoke test (TB-driven)
-
+  // Matrix multi-case end-to-end test
+  //   flow: preload A/B -> start matrix -> readback C -> compare
   //***************************************************************************
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_A = 27'd0;       // byte addr
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_B = 27'd4096;    // byte addr
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_C = 27'd8192;    // byte addr
 
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_TEST_ADDR  = 27'h0001000;
+  localparam [31:0] MATRIX_WORD_BASE_A = 32'd0;
+  localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
+  localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
 
-  localparam [C_S_AXI_DATA_WIDTH-1:0] AXI_TEST_WDATA = 32'hA5A55A5A;
-
-
+  localparam integer NUM_CASES = 8;
+  localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
+  localparam integer CASE_STATUS_PRINT_EVERY = 20000;
 
   reg [C_S_AXI_DATA_WIDTH-1:0] axi_test_rdata;
-
   reg                          axi_test_fail;
 
-
-
-  task axi_master_idle;
-
+  // -------------------------
+  // Test-pattern generators
+  // -------------------------
+  function [7:0] gen_a_elem;
+    input integer tc_idx;
+    input integer row_idx;
+    input integer k_idx;
+    integer t;
   begin
+    case (tc_idx)
+      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
+      1: t = 0;                                     // All zeros
+      2: t = row_idx - k_idx;                       // Signed pattern
+      3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
+      4: t = 13;                                    // 1x1 scalar
+      5: t = row_idx - 3;                           // K=1 pattern
+      6: t = (row_idx * 2) - k_idx + 1;             // N=1 pattern
+      7: t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8; // Mixed signed
+      default: t = 0;
+    endcase
+    gen_a_elem = t[7:0];
+  end
+  endfunction
 
+  function [7:0] gen_b_elem;
+    input integer tc_idx;
+    input integer k_idx;
+    input integer col_idx;
+    integer t;
+  begin
+    case (tc_idx)
+      0: t = k_idx * 8 + col_idx + 1;               // 1..64
+      1: t = (k_idx * 11 + col_idx * 7 + 3) % 101;  // Positive pseudo pattern
+      2: t = k_idx - (2 * col_idx);                 // Signed pattern
+      3: t = (k_idx * 3) + col_idx - 5;             // Rectangular pattern
+      4: t = -7;                                    // 1x1 scalar
+      5: t = col_idx + 1;                           // K=1 pattern
+      6: t = (k_idx % 2) ? -2 : 3;                  // N=1 pattern
+      7: t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9; // Mixed signed
+      default: t = 0;
+    endcase
+    gen_b_elem = t[7:0];
+  end
+  endfunction
+
+  function [31:0] calc_expected_elem;
+    input integer tc_idx;
+    input integer row_idx;
+    input integer col_idx;
+    input integer k_dim;
+    integer kk;
+    integer sum;
+    integer a_s;
+    integer b_s;
+    reg [7:0] a8;
+    reg [7:0] b8;
+  begin
+    sum = 0;
+    for (kk = 0; kk < k_dim; kk = kk + 1) begin
+      a8  = gen_a_elem(tc_idx, row_idx, kk);
+      b8  = gen_b_elem(tc_idx, kk, col_idx);
+      a_s = $signed(a8);
+      b_s = $signed(b8);
+      sum = sum + (a_s * b_s);
+    end
+    calc_expected_elem = sum[31:0];
+  end
+  endfunction
+
+  // -------------------------
+  // AXI helpers (to MIG AXI slave)
+  // -------------------------
+  task axi_master_idle;
+  begin
     force u_ip_top.s_axi_awid    = {C_S_AXI_ID_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_awaddr  = {C_S_AXI_ADDR_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_awlen   = 8'd0;
-
     force u_ip_top.s_axi_awsize  = 3'd2;
-
     force u_ip_top.s_axi_awburst = 2'b01;
-
     force u_ip_top.s_axi_awlock  = 1'b0;
-
     force u_ip_top.s_axi_awcache = 4'b0011;
-
     force u_ip_top.s_axi_awprot  = 3'b000;
-
     force u_ip_top.s_axi_awvalid = 1'b0;
-
-
 
     force u_ip_top.s_axi_wdata   = {C_S_AXI_DATA_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_wstrb   = {(C_S_AXI_DATA_WIDTH/8){1'b0}};
-
     force u_ip_top.s_axi_wlast   = 1'b1;
-
     force u_ip_top.s_axi_wvalid  = 1'b0;
-
     force u_ip_top.s_axi_bready  = 1'b0;
 
-
-
     force u_ip_top.s_axi_arid    = {C_S_AXI_ID_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_araddr  = {C_S_AXI_ADDR_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_arlen   = 8'd0;
-
     force u_ip_top.s_axi_arsize  = 3'd2;
-
     force u_ip_top.s_axi_arburst = 2'b01;
-
     force u_ip_top.s_axi_arlock  = 1'b0;
-
     force u_ip_top.s_axi_arcache = 4'b0011;
-
     force u_ip_top.s_axi_arprot  = 3'b000;
-
     force u_ip_top.s_axi_arvalid = 1'b0;
-
     force u_ip_top.s_axi_rready  = 1'b0;
-
   end
-
   endtask
-
-
 
   task axi_master_release;
-
   begin
-
     release u_ip_top.s_axi_awid;
-
     release u_ip_top.s_axi_awaddr;
-
     release u_ip_top.s_axi_awlen;
-
     release u_ip_top.s_axi_awsize;
-
     release u_ip_top.s_axi_awburst;
-
     release u_ip_top.s_axi_awlock;
-
     release u_ip_top.s_axi_awcache;
-
     release u_ip_top.s_axi_awprot;
-
     release u_ip_top.s_axi_awvalid;
 
-
-
     release u_ip_top.s_axi_wdata;
-
     release u_ip_top.s_axi_wstrb;
-
     release u_ip_top.s_axi_wlast;
-
     release u_ip_top.s_axi_wvalid;
-
     release u_ip_top.s_axi_bready;
 
-
-
     release u_ip_top.s_axi_arid;
-
     release u_ip_top.s_axi_araddr;
-
     release u_ip_top.s_axi_arlen;
-
     release u_ip_top.s_axi_arsize;
-
     release u_ip_top.s_axi_arburst;
-
     release u_ip_top.s_axi_arlock;
-
     release u_ip_top.s_axi_arcache;
-
     release u_ip_top.s_axi_arprot;
-
     release u_ip_top.s_axi_arvalid;
-
     release u_ip_top.s_axi_rready;
-
   end
-
   endtask
-
-
 
   task axi_write32;
-
     input [C_S_AXI_ADDR_WIDTH-1:0] addr;
-
     input [C_S_AXI_DATA_WIDTH-1:0] data;
-
   begin
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_awid    = {C_S_AXI_ID_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_awaddr  = addr;
-
     force u_ip_top.s_axi_awlen   = 8'd0;
-
     force u_ip_top.s_axi_awsize  = 3'd2;
-
     force u_ip_top.s_axi_awburst = 2'b01;
-
     force u_ip_top.s_axi_awlock  = 1'b0;
-
     force u_ip_top.s_axi_awcache = 4'b0011;
-
     force u_ip_top.s_axi_awprot  = 3'b000;
-
     force u_ip_top.s_axi_awvalid = 1'b1;
-
     while (!u_ip_top.s_axi_awready) @(posedge u_ip_top.clk);
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_awvalid = 1'b0;
 
-
-
     force u_ip_top.s_axi_wdata   = data;
-
     force u_ip_top.s_axi_wstrb   = {(C_S_AXI_DATA_WIDTH/8){1'b1}};
-
     force u_ip_top.s_axi_wlast   = 1'b1;
-
     force u_ip_top.s_axi_wvalid  = 1'b1;
-
     while (!u_ip_top.s_axi_wready) @(posedge u_ip_top.clk);
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_wvalid  = 1'b0;
 
-
-
     force u_ip_top.s_axi_bready = 1'b1;
-
     while (!u_ip_top.s_axi_bvalid) @(posedge u_ip_top.clk);
-
     if (u_ip_top.s_axi_bresp !== 2'b00) begin
-
       $display("TEST FAILED: AXI WRITE BRESP=%0h", u_ip_top.s_axi_bresp);
-
       axi_test_fail = 1'b1;
-
     end
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_bready = 1'b0;
-
   end
-
   endtask
-
-
 
   task axi_read32;
-
     input  [C_S_AXI_ADDR_WIDTH-1:0] addr;
-
     output [C_S_AXI_DATA_WIDTH-1:0] data;
-
   begin
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_arid    = {C_S_AXI_ID_WIDTH{1'b0}};
-
     force u_ip_top.s_axi_araddr  = addr;
-
     force u_ip_top.s_axi_arlen   = 8'd0;
-
     force u_ip_top.s_axi_arsize  = 3'd2;
-
     force u_ip_top.s_axi_arburst = 2'b01;
-
     force u_ip_top.s_axi_arlock  = 1'b0;
-
     force u_ip_top.s_axi_arcache = 4'b0011;
-
     force u_ip_top.s_axi_arprot  = 3'b000;
-
     force u_ip_top.s_axi_arvalid = 1'b1;
-
     while (!u_ip_top.s_axi_arready) @(posedge u_ip_top.clk);
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_arvalid = 1'b0;
 
-
-
     force u_ip_top.s_axi_rready = 1'b1;
-
     while (!u_ip_top.s_axi_rvalid) @(posedge u_ip_top.clk);
-
     data = u_ip_top.s_axi_rdata;
-
     if ((u_ip_top.s_axi_rresp !== 2'b00) || (u_ip_top.s_axi_rlast !== 1'b1)) begin
-
       $display("TEST FAILED: AXI READ RRESP=%0h RLAST=%0b",
-
                u_ip_top.s_axi_rresp, u_ip_top.s_axi_rlast);
-
       axi_test_fail = 1'b1;
-
     end
-
     @(posedge u_ip_top.clk);
-
     force u_ip_top.s_axi_rready = 1'b0;
-
   end
-
   endtask
 
+  // -------------------------
+  // Matrix wrapper cfg-bus helpers
+  // -------------------------
+  task matrix_cfg_idle;
+  begin
+    force u_ip_top.matrix_bus_valid = 1'b0;
+    force u_ip_top.matrix_bus_addr  = 32'd0;
+    force u_ip_top.matrix_bus_wdata = 32'd0;
+    force u_ip_top.matrix_bus_wstrb = 4'h0;
+  end
+  endtask
 
+  task matrix_cfg_release;
+  begin
+    release u_ip_top.matrix_bus_valid;
+    release u_ip_top.matrix_bus_addr;
+    release u_ip_top.matrix_bus_wdata;
+    release u_ip_top.matrix_bus_wstrb;
+  end
+  endtask
+
+  task matrix_cfg_write;
+    input [31:0] reg_addr;
+    input [31:0] reg_data;
+  begin
+    @(posedge u_ip_top.clk);
+    while (u_ip_top.matrix_bus_ready) @(posedge u_ip_top.clk);
+    force u_ip_top.matrix_bus_addr  = reg_addr;
+    force u_ip_top.matrix_bus_wdata = reg_data;
+    force u_ip_top.matrix_bus_wstrb = 4'hF;
+    force u_ip_top.matrix_bus_valid = 1'b1;
+    while (!u_ip_top.matrix_bus_ready) @(posedge u_ip_top.clk);
+    @(posedge u_ip_top.clk);
+    force u_ip_top.matrix_bus_valid = 1'b0;
+  end
+  endtask
+
+  task matrix_cfg_read;
+    input  [31:0] reg_addr;
+    output [31:0] reg_data;
+  begin
+    @(posedge u_ip_top.clk);
+    while (u_ip_top.matrix_bus_ready) @(posedge u_ip_top.clk);
+    force u_ip_top.matrix_bus_addr  = reg_addr;
+    force u_ip_top.matrix_bus_wdata = 32'd0;
+    force u_ip_top.matrix_bus_wstrb = 4'h0;
+    force u_ip_top.matrix_bus_valid = 1'b1;
+    while (!u_ip_top.matrix_bus_ready) @(posedge u_ip_top.clk);
+    reg_data = u_ip_top.matrix_bus_rdata;
+    @(posedge u_ip_top.clk);
+    force u_ip_top.matrix_bus_valid = 1'b0;
+  end
+  endtask
+
+  task get_case_dims;
+    input  integer tc_idx;
+    output integer m_dim;
+    output integer k_dim;
+    output integer n_dim;
+  begin
+    case (tc_idx)
+      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
+      4: begin m_dim = 1; k_dim = 1; n_dim = 1; end
+      5: begin m_dim = 8; k_dim = 1; n_dim = 8; end
+      6: begin m_dim = 8; k_dim = 8; n_dim = 1; end
+      7: begin m_dim = 3; k_dim = 8; n_dim = 5; end
+      default: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+    endcase
+  end
+  endtask
+
+  task preload_case_data;
+    input integer tc_idx;
+    input integer m_dim;
+    input integer k_dim;
+    input integer n_dim;
+    integer r;
+    integer w;
+    integer b;
+    integer col_idx;
+    integer k_words;
+    integer n_words;
+    reg [31:0] wr_word;
+    reg [7:0]  elem;
+  begin
+    k_words = (k_dim + 3) / 4;
+    n_words = (n_dim + 3) / 4;
+
+    axi_master_idle();
+
+    // A preload
+    for (r = 0; r < m_dim; r = r + 1) begin
+      for (w = 0; w < k_words; w = w + 1) begin
+        wr_word = 32'd0;
+        for (b = 0; b < 4; b = b + 1) begin
+          col_idx = w*4 + b;
+          if (col_idx < k_dim) elem = gen_a_elem(tc_idx, r, col_idx);
+          else                 elem = 8'd0;
+          wr_word = wr_word | ({24'd0, elem} << (8*b));
+        end
+        axi_write32(AXI_BASE_A + ((r*k_words + w) << 2), wr_word);
+      end
+    end
+
+    // B preload
+    for (r = 0; r < k_dim; r = r + 1) begin
+      for (w = 0; w < n_words; w = w + 1) begin
+        wr_word = 32'd0;
+        for (b = 0; b < 4; b = b + 1) begin
+          col_idx = w*4 + b;
+          if (col_idx < n_dim) elem = gen_b_elem(tc_idx, r, col_idx);
+          else                 elem = 8'd0;
+          wr_word = wr_word | ({24'd0, elem} << (8*b));
+        end
+        axi_write32(AXI_BASE_B + ((r*n_words + w) << 2), wr_word);
+      end
+    end
+
+    // Clear C region for this case footprint
+    for (r = 0; r < m_dim; r = r + 1) begin
+      for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
+        axi_write32(AXI_BASE_C + (((r*n_dim + col_idx) << 2)), 32'd0);
+      end
+    end
+
+    axi_master_release();
+  end
+  endtask
+
+  task run_case;
+    input integer tc_idx;
+    input integer m_dim;
+    input integer k_dim;
+    input integer n_dim;
+    integer r;
+    integer col_idx;
+    integer poll_count;
+    integer seen_done_clear;
+    integer seen_busy;
+    integer mismatch_count;
+    reg [31:0] expected_c;
+    reg [31:0] status;
+    reg [31:0] status_prev;
+    reg [31:0] cfg_a;
+    reg [31:0] cfg_b;
+    reg [31:0] cfg_c;
+    reg [31:0] cfg_m;
+    reg [31:0] cfg_k;
+    reg [31:0] cfg_n;
+  begin
+    $display("CASE%0d start M=%0d K=%0d N=%0d", tc_idx, m_dim, k_dim, n_dim);
+
+    // Program matrix wrapper registers (word addresses and dims).
+    matrix_cfg_write(32'h0000_0000, MATRIX_WORD_BASE_A); // reg_addr_a
+    matrix_cfg_write(32'h0000_0004, MATRIX_WORD_BASE_B); // reg_addr_b
+    matrix_cfg_write(32'h0000_0008, MATRIX_WORD_BASE_C); // reg_addr_c
+    matrix_cfg_write(32'h0000_000C, m_dim[31:0]);        // reg_m_num
+    matrix_cfg_write(32'h0000_0010, k_dim[31:0]);        // reg_k_num
+    matrix_cfg_write(32'h0000_0014, n_dim[31:0]);        // reg_n_num
+
+    // Read back config regs to ensure write handshakes really landed.
+    matrix_cfg_read(32'h0000_0000, cfg_a);
+    matrix_cfg_read(32'h0000_0004, cfg_b);
+    matrix_cfg_read(32'h0000_0008, cfg_c);
+    matrix_cfg_read(32'h0000_000C, cfg_m);
+    matrix_cfg_read(32'h0000_0010, cfg_k);
+    matrix_cfg_read(32'h0000_0014, cfg_n);
+    $display("CASE%0d cfg readback: A=%08h B=%08h C=%08h M=%0d K=%0d N=%0d",
+             tc_idx, cfg_a, cfg_b, cfg_c, cfg_m, cfg_k, cfg_n);
+
+    if ((cfg_a !== MATRIX_WORD_BASE_A) ||
+        (cfg_b !== MATRIX_WORD_BASE_B) ||
+        (cfg_c !== MATRIX_WORD_BASE_C) ||
+        (cfg_m !== m_dim[31:0])       ||
+        (cfg_k !== k_dim[31:0])       ||
+        (cfg_n !== n_dim[31:0])) begin
+      $display("CASE%0d TEST FAILED: CFG readback mismatch", tc_idx);
+      axi_test_fail = 1'b1;
+      disable run_case;
+    end
+
+    // Start run.
+    matrix_cfg_write(32'h0000_001C, 32'h0000_0001);      // start
+
+    // Poll status reg 0x20: bit[1]=done_latched, bit[0]=busy
+    status = 32'd0;
+    status_prev = 32'hFFFF_FFFF;
+    poll_count  = 0;
+    seen_done_clear = 0;
+    seen_busy       = 0;
+    while (((!status[1]) || (!seen_done_clear)) &&
+           (poll_count < CASE_DONE_TIMEOUT_POLLS)) begin
+      matrix_cfg_read(32'h0000_0020, status);
+      poll_count = poll_count + 1;
+      if (!status[1]) seen_done_clear = 1;
+      if (status[0])  seen_busy       = 1;
+
+      if (status !== status_prev) begin
+        $display("CASE%0d status change: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
+                 tc_idx, status, status[0], status[1], poll_count, $time);
+        status_prev = status;
+      end
+      else if ((poll_count % CASE_STATUS_PRINT_EVERY) == 0) begin
+        $display("CASE%0d waiting done: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
+                 tc_idx, status, status[0], status[1], poll_count, $time);
+      end
+    end
+
+    if (!status[1] || !seen_done_clear) begin
+      $display("CASE%0d TIMEOUT waiting done: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
+               tc_idx, status, status[0], status[1], poll_count, $time);
+      axi_test_fail = 1'b1;
+      disable run_case;
+    end
+
+    if (!seen_busy) begin
+      $display("CASE%0d WARNING: busy was never observed high (very fast or start issue)",
+               tc_idx);
+    end
+
+    $display("CASE%0d matrix done", tc_idx);
+
+    // Readback C and compare
+    mismatch_count = 0;
+    axi_master_idle();
+    for (r = 0; r < m_dim; r = r + 1) begin
+      for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
+        axi_read32(AXI_BASE_C + (((r*n_dim + col_idx) << 2)), axi_test_rdata);
+        expected_c = calc_expected_elem(tc_idx, r, col_idx, k_dim);
+        if (axi_test_rdata !== expected_c) begin
+          if (mismatch_count < 8) begin
+            $display("CASE%0d MISMATCH r=%0d c=%0d exp=%h got=%h",
+                     tc_idx, r, col_idx, expected_c, axi_test_rdata);
+          end
+          mismatch_count = mismatch_count + 1;
+          axi_test_fail  = 1'b1;
+        end
+      end
+    end
+    axi_master_release();
+
+    if (mismatch_count == 0)
+      $display("CASE%0d PASSED", tc_idx);
+    else
+      $display("CASE%0d FAILED mismatch_count=%0d", tc_idx, mismatch_count);
+  end
+  endtask
 
   //***************************************************************************
-
-  // Reporting the test case status
-
+  // Top-level test flow
   //***************************************************************************
-
   initial
-
   begin : Logging
+     integer tc;
+     integer m_dim;
+     integer k_dim;
+     integer n_dim;
 
      axi_test_fail  = 1'b0;
-
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
 
-
-
      fork
-
-        begin : run_axi_smoke
-
+        begin : run_matrix_multicase
            wait (init_calib_complete);
-
            $display("Calibration Done");
 
+           // Freeze example_top's built-in cfg FSM in IDLE;
+           // TB will drive matrix bus for each case.
+           force u_ip_top.matrix_cfg_state = 4'd0;
+           matrix_cfg_idle();
 
-
-           // Hold matrix control bus inactive so TB owns AXI master signals.
-
-           force u_ip_top.matrix_bus_valid = 1'b0;
-
-           force u_ip_top.matrix_bus_wstrb = 4'h0;
-
-
-
-           axi_master_idle();
-
-           axi_write32(AXI_TEST_ADDR, AXI_TEST_WDATA);
-
-           axi_read32 (AXI_TEST_ADDR, axi_test_rdata);
-
-
-
-           if (!axi_test_fail && (axi_test_rdata === AXI_TEST_WDATA)) begin
-
-              $display("TEST PASSED: AXI RW addr=%h write=%h read=%h",
-
-                       AXI_TEST_ADDR, AXI_TEST_WDATA, axi_test_rdata);
-
-           end else begin
-
-              $display("TEST FAILED: AXI RW addr=%h write=%h read=%h",
-
-                       AXI_TEST_ADDR, AXI_TEST_WDATA, axi_test_rdata);
-
+           for (tc = 0; tc < NUM_CASES; tc = tc + 1) begin
+             get_case_dims(tc, m_dim, k_dim, n_dim);
+             preload_case_data(tc, m_dim, k_dim, n_dim);
+             $display("CASE%0d preload done: A@%h B@%h C@%h", tc, AXI_BASE_A, AXI_BASE_B, AXI_BASE_C);
+             run_case(tc, m_dim, k_dim, n_dim);
            end
 
+           if (!axi_test_fail)
+             $display("TEST PASSED: MATRIX MULTI-CASE (%0d cases)", NUM_CASES);
+           else
+             $display("TEST FAILED: MATRIX MULTI-CASE");
 
-
-           axi_master_release();
-
-           release u_ip_top.matrix_bus_valid;
-
-           release u_ip_top.matrix_bus_wstrb;
-
-
+           matrix_cfg_release();
+           release u_ip_top.matrix_cfg_state;
 
            disable test_timeout;
-
            $finish;
-
         end
-
-
 
         begin : test_timeout
-
            if (SIM_BYPASS_INIT_CAL == "SIM_INIT_CAL_FULL")
-
              #2500000000.0;
-
            else
-
              #1000000000.0;
 
+           if (!init_calib_complete)
+             $display("TEST FAILED: INITIALIZATION DID NOT COMPLETE");
+           else
+             $display("TEST FAILED: MATRIX MULTI-CASE TIMEOUT");
 
-
-           if (!init_calib_complete) begin
-
-              $display("TEST FAILED: INITIALIZATION DID NOT COMPLETE");
-
-           end
-
-           else begin
-
-              $display("TEST FAILED: AXI RW TEST TIMEOUT");
-
-           end
-
-
-
-           disable run_axi_smoke;
-
+           disable run_matrix_multicase;
            $finish;
-
         end
-
      join
-
   end
-
 endmodule
-
-
-
-
