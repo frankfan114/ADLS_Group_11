@@ -1114,6 +1114,7 @@ module sim_tb_top;
   localparam integer NUM_CASES = 8;
   localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
+  localparam integer PRINT_CASE_MATRIX_VALUES = 1;
 
   reg [C_S_AXI_DATA_WIDTH-1:0] axi_test_rdata;
   reg                          axi_test_fail;
@@ -1547,11 +1548,22 @@ module sim_tb_top;
 
     // Readback C and compare
     mismatch_count = 0;
+    if (PRINT_CASE_MATRIX_VALUES != 0)
+      $display("CASE%0d C compare dump begin (per-row, format: exp/got)", tc_idx);
     axi_master_idle();
     for (r = 0; r < m_dim; r = r + 1) begin
       for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
         axi_read32(AXI_BASE_C + (((r*n_dim + col_idx) << 2)), axi_test_rdata);
         expected_c = calc_expected_elem(tc_idx, r, col_idx, k_dim);
+        if (PRINT_CASE_MATRIX_VALUES != 0) begin
+          if (col_idx == 0)
+            $write("CASE%0d C row %0d : ", tc_idx, r);
+          $write("%0d/%0d", $signed(expected_c), $signed(axi_test_rdata));
+          if (col_idx == (n_dim - 1))
+            $display("");
+          else
+            $write(" ");
+        end
         if (axi_test_rdata !== expected_c) begin
           if (mismatch_count < 8) begin
             $display("CASE%0d MISMATCH r=%0d c=%0d exp=%h got=%h",
@@ -1563,6 +1575,8 @@ module sim_tb_top;
       end
     end
     axi_master_release();
+    if (PRINT_CASE_MATRIX_VALUES != 0)
+      $display("CASE%0d C compare dump end", tc_idx);
 
     if (mismatch_count == 0)
       $display("CASE%0d PASSED", tc_idx);
