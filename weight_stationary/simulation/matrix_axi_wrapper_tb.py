@@ -82,12 +82,27 @@ class AxiMemoryModel:
         self.aw_stall = 0
         self.w_stall = 0
         self.ar_stall = 0
+        self.read_hist = {}
+        self.write_hist = {}
 
     def load_word(self, word_addr, value):
         self.mem[word_addr] = value & 0xFFFFFFFF
 
     def read_word(self, word_addr):
         return self.mem.get(word_addr, 0) & 0xFFFFFFFF
+
+    def clear_stats(self):
+        self.read_hist.clear()
+        self.write_hist.clear()
+
+    def _bump(self, hist, word_addr):
+        hist[word_addr] = hist.get(word_addr, 0) + 1
+
+    def count_reads(self, base_word, words):
+        return sum(self.read_hist.get(base_word + off, 0) for off in range(words))
+
+    def count_writes(self, base_word, words):
+        return sum(self.write_hist.get(base_word + off, 0) for off in range(words))
 
     def _rand_stall(self):
         if self.wait_prob > 0.0 and random.random() < self.wait_prob:
@@ -161,6 +176,7 @@ class AxiMemoryModel:
                                 newv &= ~(0xFF << (8 * b))
                                 newv |= ((wdata >> (8 * b)) & 0xFF) << (8 * b)
                         self.load_word(word_addr, newv)
+                        self._bump(self.write_hist, word_addr)
 
                         self.dut.m_axi_bvalid.value = 1
                         self.dut.m_axi_bresp.value = 0  # OKAY
@@ -179,6 +195,7 @@ class AxiMemoryModel:
                     if int(self.dut.m_axi_arvalid.value) == 1:
                         araddr = int(self.dut.m_axi_araddr.value)
                         word_addr = araddr >> 2
+                        self._bump(self.read_hist, word_addr)
                         self.dut.m_axi_rdata.value = self.read_word(word_addr)
                         self.dut.m_axi_rresp.value = 0  # OKAY
                         self.dut.m_axi_rid.value = 0
@@ -242,6 +259,10 @@ async def wait_done_via_status(dut, timeout_cycles=800000):
 
 def pattern_word(base_word, offset):
     return (0xA5A50000 ^ ((base_word + offset) * 0x1F1F1F1F)) & 0xFFFFFFFF
+
+
+def packed_words_per_row(cols, elems_per_word=4):
+    return (cols + elems_per_word - 1) // elems_per_word
 
 
 def preload_c_region(mem, base_word, words):
@@ -388,6 +409,55 @@ async def test_matrix_top_wrapper_axi(dut):
     await reset_dut(dut)
     for case in repeat_cases:
         await run_one_case(dut, mem, **case)
+
+    # WS-specific traffic check: when K and N fit in one tile, B should be loaded once
+    # and then reused across all M tiles.
+    await reset_dut(dut)
+    mem.clear_stats()
+    reuse_case = dict(
+        case_name="ws_b_reuse_single_kn_tile",
+        M=32,
+        K=8,
+        N=8,
+        data_mode="random",
+        baseA_word=5000,
+        baseB_word=7000,
+        baseC_word=9000,
+        wait_prob=0.0,
+        max_wait=1,
+    )
+    await run_one_case(dut, mem, **reuse_case)
+
+    b_words_total = reuse_case["K"] * packed_words_per_row(reuse_case["N"])
+    a_words_total = reuse_case["M"] * packed_words_per_row(reuse_case["K"])
+    c_words_total = reuse_case["M"] * reuse_case["N"]
+    m_tile_count = (reuse_case["M"] + 7) // 8
+
+    actual_b_reads = mem.count_reads(reuse_case["baseB_word"], b_words_total)
+    actual_a_reads = mem.count_reads(reuse_case["baseA_word"], a_words_total)
+    actual_c_writes = mem.count_writes(reuse_case["baseC_word"], c_words_total)
+
+    expected_b_reads_ws = b_words_total
+    expected_b_reads_naive = m_tile_count * b_words_total
+
+    if actual_b_reads != expected_b_reads_ws:
+        raise AssertionError(
+            f"WS B reuse check failed: expected {expected_b_reads_ws} B reads, got {actual_b_reads}"
+        )
+    if actual_a_reads != a_words_total:
+        raise AssertionError(
+            f"WS B reuse check failed: expected {a_words_total} A reads, got {actual_a_reads}"
+        )
+    if actual_c_writes != c_words_total:
+        raise AssertionError(
+            f"WS B reuse check failed: expected {c_words_total} C writes, got {actual_c_writes}"
+        )
+
+    dut._log.info(
+        "PASS WS DDR reuse check: "
+        f"B reads={actual_b_reads} vs naive_no_reuse={expected_b_reads_naive}, "
+        f"A reads={actual_a_reads}, C writes={actual_c_writes}"
+    )
 
     dut._log.info("ALL AXI WRAPPER TEST CASES PASSED")
 

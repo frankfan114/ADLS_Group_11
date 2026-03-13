@@ -13,6 +13,7 @@ module matrix_core #(
     input  logic                    rst_n,
 
     input  logic                        core_start,
+    input  logic                        allow_b_reuse,
     input  logic [$clog2(MAX_M+1)-1:0]  mat_m_num,
     input  logic [$clog2(MAX_K+1)-1:0]  mat_k_num,
     input  logic [$clog2(MAX_N+1)-1:0]  mat_n_num,
@@ -126,6 +127,21 @@ module matrix_core #(
     logic [MAX_K*MAX_N*DATA_W-1:0] b_matrix_flat;
     logic [$clog2(MAX_M+1)-1:0]    a_store_row;
     logic [$clog2(MAX_K+1)-1:0]    b_store_row;
+    logic                          b_tile_cached;
+    logic [ADDR_WIDTH-1:0]         b_cached_base_addr;
+    logic [ADDR_WIDTH-1:0]         b_cached_row_stride;
+    logic [$clog2(MAX_K+1)-1:0]    b_cached_k_num;
+    logic [$clog2(MAX_N+1)-1:0]    b_cached_n_num;
+    logic                          need_load_b;
+
+    always_comb begin
+        need_load_b = !allow_b_reuse
+                   || !b_tile_cached
+                   || (b_cached_base_addr  != base_addr_B)
+                   || (b_cached_row_stride != row_stride_B)
+                   || (b_cached_k_num      != mat_k_num)
+                   || (b_cached_n_num      != mat_n_num);
+    end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -133,6 +149,11 @@ module matrix_core #(
             b_matrix_flat <= '0;
             a_store_row   <= '0;
             b_store_row   <= '0;
+            b_tile_cached <= 1'b0;
+            b_cached_base_addr  <= '0;
+            b_cached_row_stride <= '0;
+            b_cached_k_num      <= '0;
+            b_cached_n_num      <= '0;
         end else begin
             if (fifoA_start) begin
                 a_matrix_flat <= '0;
@@ -150,6 +171,14 @@ module matrix_core #(
                 b_matrix_flat[b_store_row*MAX_N*DATA_W +: MAX_N*DATA_W] <= b_row;
                 if (b_store_row < MAX_K)
                     b_store_row <= b_store_row + 1'b1;
+            end
+
+            if ((state == S_LOAD_B) && b_done) begin
+                b_tile_cached       <= 1'b1;
+                b_cached_base_addr  <= base_addr_B;
+                b_cached_row_stride <= row_stride_B;
+                b_cached_k_num      <= mat_k_num;
+                b_cached_n_num      <= mat_n_num;
             end
         end
     end
@@ -183,7 +212,7 @@ module matrix_core #(
         state_n = state;
         case (state)
             S_IDLE:    if (core_start) state_n = S_LOAD_A;
-            S_LOAD_A:  if (a_done)     state_n = S_LOAD_B;
+            S_LOAD_A:  if (a_done)     state_n = need_load_b ? S_LOAD_B : S_START;
             S_LOAD_B:  if (b_done)     state_n = S_START;
             S_START:                    state_n = S_COMPUTE;
             S_COMPUTE: if (ws_done)    state_n = S_IDLE;

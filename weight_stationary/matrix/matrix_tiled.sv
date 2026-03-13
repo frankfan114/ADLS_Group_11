@@ -129,6 +129,7 @@ module matrix_tiled #(
     end
 
     logic core_start, core_busy, core_done;
+    logic core_allow_b_reuse;
     logic core_mem_valid;
     logic [31:0] core_mem_addr;
     logic [31:0] core_mem_wdata;
@@ -149,6 +150,7 @@ module matrix_tiled #(
         .rst_n        (rst_n),
 
         .core_start   (core_start),
+        .allow_b_reuse(core_allow_b_reuse),
         .mat_m_num    (cur_m_num),
         .mat_k_num    (cur_k_num),
         .mat_n_num    (cur_n_num),
@@ -170,6 +172,11 @@ module matrix_tiled #(
         .core_busy    (core_busy),
         .core_done    (core_done)
     );
+
+    // Reuse B only when the whole B matrix tile stays unchanged while M tiles advance.
+    assign core_allow_b_reuse = (tile_m_idx != 16'd0)
+                             && (num_tile_k == 16'd1)
+                             && (num_tile_n == 16'd1);
 
     localparam int TOTAL_ELEMS_TILE = MAX_M * MAX_N;
     logic [ACC_W*MAX_M*MAX_N-1:0] c_accum_flat;
