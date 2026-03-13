@@ -240,6 +240,27 @@ async def wait_done_via_status(dut, timeout_cycles=800000):
     raise RuntimeError("TIMEOUT waiting done_latched via status register")
 
 
+def pattern_word(base_word, offset):
+    return (0xA5A50000 ^ ((base_word + offset) * 0x1F1F1F1F)) & 0xFFFFFFFF
+
+
+def preload_c_region(mem, base_word, words):
+    expected = {}
+    for off in range(words):
+        val = pattern_word(base_word, off)
+        mem.load_word(base_word + off, val)
+        expected[base_word + off] = val
+    return expected
+
+
+async def check_status_idle(dut):
+    status = await bus_read(dut, 0x20)
+    if status & 0x1:
+        raise AssertionError(f"sys_busy should be 0 after completion, got status=0x{status:08x}")
+    if ((status >> 1) & 0x1) != 1:
+        raise AssertionError(f"done_latched should be 1 after completion, got status=0x{status:08x}")
+
+
 async def run_one_case(
     dut,
     mem,
@@ -247,14 +268,26 @@ async def run_one_case(
     K,
     N,
     *,
+    case_name=None,
     data_mode="random",
     baseA_word=0,
     baseB_word=2048,
     baseC_word=4096,
+    wait_prob=None,
+    max_wait=None,
 ):
+    if wait_prob is not None:
+        mem.wait_prob = float(wait_prob)
+    if max_wait is not None:
+        mem.max_wait = int(max_wait)
+
+    case_name = case_name or f"M{M}_K{K}_N{N}_{data_mode}"
     A = gen_matrix(M, K, data_mode)
     B = gen_matrix_B(K, N, data_mode)
     C_ref = golden_matmul_s8_s32(A, B, M, K, N)
+    output_words = max(1, M * N)
+    guard_words = 4
+    expected_prefill = preload_c_region(mem, baseC_word, output_words + guard_words)
 
     # preload A (packed s8) to word-addressed memory
     addr = baseA_word
@@ -280,18 +313,44 @@ async def run_one_case(
     await bus_write(dut, 0x1C, 0x1)  # start
 
     await wait_done_via_status(dut)
+    await check_status_idle(dut)
 
     # check C (unpacked s32, one word per element)
-    for i in range(M):
-        for j in range(N):
-            raw = mem.read_word(baseC_word + i * N + j)
-            got = u32_to_s32(raw)
-            exp = C_ref[i][j]
-            if got != exp:
-                dut._log.error(f"C[{i},{j}] exp={exp} got={got} raw=0x{raw:08x}")
-                raise AssertionError("AXI wrapper GEMM mismatch")
+    if M > 0 and K > 0 and N > 0:
+        for i in range(M):
+            for j in range(N):
+                raw = mem.read_word(baseC_word + i * N + j)
+                got = u32_to_s32(raw)
+                exp = C_ref[i][j]
+                if got != exp:
+                    dut._log.error(f"{case_name}: C[{i},{j}] exp={exp} got={got} raw=0x{raw:08x}")
+                    raise AssertionError("AXI wrapper GEMM mismatch")
 
-    dut._log.info(f"PASS AXI wrapper GEMM: M={M} K={K} N={N} mode={data_mode}")
+    # check guard region remains unchanged, including zero-dimension cases
+    for off in range(M * N, output_words + guard_words):
+        addr_word = baseC_word + off
+        got = mem.read_word(addr_word)
+        exp = expected_prefill[addr_word]
+        if got != exp:
+            dut._log.error(
+                f"{case_name}: guard word overwrite at addr=0x{addr_word:08x} exp=0x{exp:08x} got=0x{got:08x}"
+            )
+            raise AssertionError("AXI wrapper wrote outside expected output region")
+
+    # zero-sized outputs should leave even the first C word untouched
+    if M == 0 or N == 0 or K == 0:
+        got = mem.read_word(baseC_word)
+        exp = expected_prefill[baseC_word]
+        if got != exp:
+            dut._log.error(
+                f"{case_name}: zero-dimension run should not modify C base exp=0x{exp:08x} got=0x{got:08x}"
+            )
+            raise AssertionError("AXI wrapper modified C for zero-dimension case")
+
+    dut._log.info(
+        f"PASS AXI wrapper GEMM: case={case_name} M={M} K={K} N={N} mode={data_mode} "
+        f"baseA={baseA_word} baseB={baseB_word} baseC={baseC_word} wait_prob={mem.wait_prob}"
+    )
 
 
 @cocotb.test()
@@ -303,11 +362,32 @@ async def test_matrix_top_wrapper_axi(dut):
     mem = AxiMemoryModel(dut, wait_prob=0.20, max_wait=4)
     cocotb.start_soon(mem.run())
 
-    await reset_dut(dut)
+    isolated_cases = [
+        dict(case_name="smoke_1x1x1", M=1, K=1, N=1, data_mode="ramp", baseA_word=0, baseB_word=2048, baseC_word=4096, wait_prob=0.20, max_wait=4),
+        dict(case_name="zero_m", M=0, K=5, N=7, data_mode="random", baseA_word=11, baseB_word=301, baseC_word=611, wait_prob=0.10, max_wait=3),
+        dict(case_name="zero_k", M=6, K=0, N=4, data_mode="random", baseA_word=19, baseB_word=347, baseC_word=701, wait_prob=0.10, max_wait=3),
+        dict(case_name="zero_n", M=5, K=7, N=0, data_mode="random", baseA_word=23, baseB_word=389, baseC_word=809, wait_prob=0.10, max_wait=3),
+        dict(case_name="exact_tile_random", M=8, K=8, N=8, data_mode="random", baseA_word=0, baseB_word=2048, baseC_word=4096, wait_prob=0.20, max_wait=4),
+        dict(case_name="max_values", M=5, K=8, N=7, data_mode="max", baseA_word=37, baseB_word=521, baseC_word=1031, wait_prob=0.0, max_wait=1),
+        dict(case_name="min_values", M=7, K=8, N=5, data_mode="min", baseA_word=41, baseB_word=613, baseC_word=1231, wait_prob=0.0, max_wait=1),
+        dict(case_name="odd_sizes_ramp", M=3, K=11, N=17, data_mode="ramp", baseA_word=53, baseB_word=911, baseC_word=1601, wait_prob=0.25, max_wait=5),
+        dict(case_name="mixed_tiling_random", M=10, K=7, N=9, data_mode="random", baseA_word=67, baseB_word=1201, baseC_word=2201, wait_prob=0.20, max_wait=4),
+        dict(case_name="large_multi_tile_random", M=16, K=7, N=19, data_mode="random", baseA_word=79, baseB_word=1501, baseC_word=2801, wait_prob=0.20, max_wait=4),
+        dict(case_name="wide_k_partial_random", M=9, K=13, N=5, data_mode="random", baseA_word=97, baseB_word=1901, baseC_word=3401, wait_prob=0.20, max_wait=4),
+    ]
 
-    await run_one_case(dut, mem, 1, 1, 1, data_mode="ramp")
-    await run_one_case(dut, mem, 8, 8, 8, data_mode="random")
-    await run_one_case(dut, mem, 10, 7, 9, data_mode="random")
+    for case in isolated_cases:
+        await reset_dut(dut)
+        await run_one_case(dut, mem, **case)
+
+    repeat_cases = [
+        dict(case_name="repeat_same_output_base_first", M=4, K=9, N=4, data_mode="one", baseA_word=101, baseB_word=2401, baseC_word=4096, wait_prob=0.30, max_wait=5),
+        dict(case_name="repeat_same_output_base_second", M=4, K=9, N=4, data_mode="random", baseA_word=131, baseB_word=2601, baseC_word=4096, wait_prob=0.30, max_wait=5),
+    ]
+
+    await reset_dut(dut)
+    for case in repeat_cases:
+        await run_one_case(dut, mem, **case)
 
     dut._log.info("ALL AXI WRAPPER TEST CASES PASSED")
 

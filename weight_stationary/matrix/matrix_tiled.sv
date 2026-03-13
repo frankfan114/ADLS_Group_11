@@ -17,13 +17,13 @@ module matrix_tiled #(
     input  logic [15:0]             glob_k_num,
     input  logic [15:0]             glob_n_num,
 
-    input  logic [ADDR_WIDTH-1:0]   base_addr_A,  // WORD address, A uint8 packed
-    input  logic [ADDR_WIDTH-1:0]   base_addr_B,  // WORD address, B uint8 packed
-    input  logic [ADDR_WIDTH-1:0]   base_addr_C,  // WORD address, C uint32 unpacked
+    input  logic [ADDR_WIDTH-1:0]   base_addr_A,
+    input  logic [ADDR_WIDTH-1:0]   base_addr_B,
+    input  logic [ADDR_WIDTH-1:0]   base_addr_C,
 
     output logic                    mem_valid,
     input  logic                    mem_ready,
-    output logic [31:0]             mem_addr,      // BYTE address
+    output logic [31:0]             mem_addr,
     output logic [31:0]             mem_wdata,
     output logic [3:0]              mem_wstrb,
     input  logic [31:0]             mem_rdata,
@@ -36,13 +36,12 @@ module matrix_tiled #(
     localparam int TILE_K = MAX_K;
     localparam int TILE_N = MAX_N;
 
-    localparam int ELEMS_PER_WORD = SRAM_W / DATA_W; // 4
-    localparam int ELEMS_SHIFT  = $clog2(ELEMS_PER_WORD); // 2
-    localparam int TILE_M_SHIFT = $clog2(TILE_M);         // 3
-    localparam int TILE_K_SHIFT = $clog2(TILE_K);         // 3
-    localparam int TILE_N_SHIFT = $clog2(TILE_N);         // 3
+    localparam int ELEMS_PER_WORD = SRAM_W / DATA_W;
+    localparam int ELEMS_SHIFT  = $clog2(ELEMS_PER_WORD);
+    localparam int TILE_M_SHIFT = $clog2(TILE_M);
+    localparam int TILE_K_SHIFT = $clog2(TILE_K);
+    localparam int TILE_N_SHIFT = $clog2(TILE_N);
 
-    // -------- row strides --------
     logic [ADDR_WIDTH-1:0] row_stride_A_words;
     logic [ADDR_WIDTH-1:0] row_stride_B_words;
     logic [ADDR_WIDTH-1:0] row_stride_C_words;
@@ -53,7 +52,6 @@ module matrix_tiled #(
         row_stride_C_words = glob_n_num;
     end
 
-    // -------- tile counts --------
     logic [15:0] num_tile_m, num_tile_n, num_tile_k;
     always_comb begin
         num_tile_m = (glob_m_num == 0) ? 16'd0 : ((glob_m_num + (TILE_M-1)) >> TILE_M_SHIFT);
@@ -69,18 +67,28 @@ module matrix_tiled #(
     logic [$clog2(MAX_N+1)-1:0] cur_n_num;
 
     always_comb begin
-        cur_m_num = (tile_m_idx == num_tile_m - 1) ? (glob_m_num - tile_m_idx * TILE_M) : TILE_M;
-        cur_n_num = (tile_n_idx == num_tile_n - 1) ? (glob_n_num - tile_n_idx * TILE_N) : TILE_N;
-        cur_k_num = (tile_k_idx == num_tile_k - 1) ? (glob_k_num - tile_k_idx * TILE_K) : TILE_K;
+        if (num_tile_m == 0)
+            cur_m_num = '0;
+        else
+            cur_m_num = (tile_m_idx == num_tile_m - 1) ? (glob_m_num - tile_m_idx * TILE_M) : TILE_M;
+
+        if (num_tile_n == 0)
+            cur_n_num = '0;
+        else
+            cur_n_num = (tile_n_idx == num_tile_n - 1) ? (glob_n_num - tile_n_idx * TILE_N) : TILE_N;
+
+        if (num_tile_k == 0)
+            cur_k_num = '0;
+        else
+            cur_k_num = (tile_k_idx == num_tile_k - 1) ? (glob_k_num - tile_k_idx * TILE_K) : TILE_K;
     end
 
-    // -------- tile FSM --------
     typedef enum logic [2:0] {
         TS_IDLE       = 3'd0,
         TS_INIT_TILE  = 3'd1,
         TS_START_CORE = 3'd2,
         TS_WAIT_CORE  = 3'd3,
-        TS_ACCUM      = 3'd4, // 1-cycle accumulate commit
+        TS_ACCUM      = 3'd4,
         TS_WB_START   = 3'd5,
         TS_WB_WAIT    = 3'd6,
         TS_DONE       = 3'd7
@@ -88,25 +96,18 @@ module matrix_tiled #(
 
     t_state_e t_state, t_state_n;
 
-    // -------- registered tile base addresses --------
     logic [ADDR_WIDTH-1:0] base_addr_A_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_B_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_C_tile_r;
 
-    // 控制：本次 TS_INIT_TILE 是否要保留 accumulator（用于 K-continue）
-    logic init_keep_accum; // 1 => TS_INIT_TILE 不清 accum
-
-    // latch keep flag on transition into TS_INIT_TILE from TS_ACCUM (k-continue)
+    logic init_keep_accum;
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n)
             init_keep_accum <= 1'b0;
-        end else begin
-            // default 0; set only for TS_ACCUM -> TS_INIT_TILE path
+        else
             init_keep_accum <= (t_state == TS_ACCUM) && (t_state_n == TS_INIT_TILE);
-        end
     end
 
-    // update base regs in TS_INIT_TILE every time (including between K tiles)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             base_addr_A_tile_r <= '0;
@@ -127,7 +128,6 @@ module matrix_tiled #(
         end
     end
 
-    // -------- core instance --------
     logic core_start, core_busy, core_done;
     logic core_mem_valid;
     logic [31:0] core_mem_addr;
@@ -171,7 +171,6 @@ module matrix_tiled #(
         .core_done    (core_done)
     );
 
-    // -------- C tile accumulator --------
     localparam int TOTAL_ELEMS_TILE = MAX_M * MAX_N;
     logic [ACC_W*MAX_M*MAX_N-1:0] c_accum_flat;
     logic                         accum_valid;
@@ -182,7 +181,6 @@ module matrix_tiled #(
 
     wire last_tk_curr = (tile_k_idx == (num_tile_k - 1));
 
-    // snapshot core output & last_k decision at core_done
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             core_partial_flat_r <= '0;
@@ -193,14 +191,11 @@ module matrix_tiled #(
         end
     end
 
-    // commit accumulation only in TS_ACCUM
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             accum_valid  <= 1'b0;
             c_accum_flat <= '0;
         end else begin
-            // clear only when starting a NEW (m,n) tile
-            // i.e., TS_INIT_TILE entered from start/wb paths, not from k-continue
             if ((t_state == TS_INIT_TILE) && !init_keep_accum) begin
                 accum_valid  <= 1'b0;
                 c_accum_flat <= '0;
@@ -220,7 +215,6 @@ module matrix_tiled #(
         end
     end
 
-    // -------- writeback --------
     logic wb_start;
     logic wb_valid, wb_ready;
     logic [ADDR_WIDTH-1:0] wb_addr_word;
@@ -257,10 +251,11 @@ module matrix_tiled #(
         .writeback_done           (wb_done)
     );
 
-    // -------- tile FSM regs --------
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) t_state <= TS_IDLE;
-        else        t_state <= t_state_n;
+        if (!rst_n)
+            t_state <= TS_IDLE;
+        else
+            t_state <= t_state_n;
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -292,13 +287,13 @@ module matrix_tiled #(
                 tile_k_idx_n = 16'd0;
             end
 
-            // advance k index when core finishes
             TS_WAIT_CORE: if (core_done) begin
-                if (!last_tk_curr) tile_k_idx_n = tile_k_idx + 16'd1;
-                else               tile_k_idx_n = 16'd0;
+                if (!last_tk_curr)
+                    tile_k_idx_n = tile_k_idx + 16'd1;
+                else
+                    tile_k_idx_n = 16'd0;
             end
 
-            // advance m/n after writeback
             TS_WB_WAIT: if (wb_done) begin
                 if (!last_tile_mn) begin
                     if (last_tn) begin
@@ -314,7 +309,6 @@ module matrix_tiled #(
         endcase
     end
 
-    // FSM control
     always_comb begin
         t_state_n  = t_state;
         core_start = 1'b0;
@@ -322,11 +316,15 @@ module matrix_tiled #(
 
         case (t_state)
             TS_IDLE: begin
-                if (start) t_state_n = TS_INIT_TILE;
+                if (start) begin
+                    if ((glob_m_num == 0) || (glob_k_num == 0) || (glob_n_num == 0))
+                        t_state_n = TS_DONE;
+                    else
+                        t_state_n = TS_INIT_TILE;
+                end
             end
 
             TS_INIT_TILE: begin
-                // always go start core after one cycle of addr update
                 t_state_n = TS_START_CORE;
             end
 
@@ -336,17 +334,15 @@ module matrix_tiled #(
             end
 
             TS_WAIT_CORE: begin
-                if (core_done) begin
+                if (core_done)
                     t_state_n = TS_ACCUM;
-                end
             end
 
             TS_ACCUM: begin
-                // IMPORTANT:
-                // - if more K tiles remain: go TS_INIT_TILE to update registered base_addr_* for new tile_k_idx
-                // - if last K: go writeback
-                if (!k_last_done_r) t_state_n = TS_INIT_TILE;
-                else                t_state_n = TS_WB_START;
+                if (!k_last_done_r)
+                    t_state_n = TS_INIT_TILE;
+                else
+                    t_state_n = TS_WB_START;
             end
 
             TS_WB_START: begin
@@ -356,8 +352,10 @@ module matrix_tiled #(
 
             TS_WB_WAIT: begin
                 if (wb_done) begin
-                    if (last_tile_mn) t_state_n = TS_DONE;
-                    else              t_state_n = TS_INIT_TILE;
+                    if (last_tile_mn)
+                        t_state_n = TS_DONE;
+                    else
+                        t_state_n = TS_INIT_TILE;
                 end
             end
 
@@ -372,7 +370,6 @@ module matrix_tiled #(
     assign busy = (t_state != TS_IDLE) && (t_state != TS_DONE);
     assign done = (t_state == TS_DONE);
 
-    // -------- memory arbitration (unchanged per your request) --------
     always_comb begin
         mem_valid = 1'b0;
         mem_addr  = 32'h0;
@@ -398,6 +395,5 @@ module matrix_tiled #(
             wb_ready  = mem_ready;
         end
     end
-
 
 endmodule
