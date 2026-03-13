@@ -1,10 +1,12 @@
-weight_stationary\simulation\sim_build_matrix_wrapper
+# simulation build outputs
+weight_stationary/simulation/sim_build_matrix_wrapper/
 
-weight_stationary\simulation\matrix_tiled_ws_check.vvp
+# waveform files
+weight_stationary/simulation/matrix_tiled_ws_check.vvp
+weight_stationary/simulation/matrix_top_wrapper_ws_check.vvp
 
-weight_stationary\simulation\matrix_top_wrapper_ws_check.vvp
+# results
+weight_stationary/simulation/matrix_wrapper_results.xml
 
-weight_stationary\simulation\matrix_wrapper_results.xml
-
-weight_stationary\simulation\__pycache__
-
+# python cache
+__pycache__/
