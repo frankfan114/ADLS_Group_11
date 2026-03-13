@@ -1,151 +1,3 @@
-//*****************************************************************************
-
-// (c) Copyright 2009 - 2010 Xilinx, Inc. All rights reserved.
-
-//
-
-// This file contains confidential and proprietary information
-
-// of Xilinx, Inc. and is protected under U.S. and
-
-// international copyright and other intellectual property
-
-// laws.
-
-//
-
-// DISCLAIMER
-
-// This disclaimer is not a license and does not grant any
-
-// rights to the materials distributed herewith. Except as
-
-// otherwise provided in a valid license issued to you by
-
-// Xilinx, and to the maximum extent permitted by applicable
-
-// law: (1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND
-
-// WITH ALL FAULTS, AND XILINX HEREBY DISCLAIMS ALL WARRANTIES
-
-// AND CONDITIONS, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING
-
-// BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, NON-
-
-// INFRINGEMENT, OR FITNESS FOR ANY PARTICULAR PURPOSE; and
-
-// (2) Xilinx shall not be liable (whether in contract or tort,
-
-// including negligence, or under any other theory of
-
-// liability) for any loss or damage of any kind or nature
-
-// related to, arising under or in connection with these
-
-// materials, including for any direct, or any indirect,
-
-// special, incidental, or consequential loss or damage
-
-// (including loss of data, profits, goodwill, or any type of
-
-// loss or damage suffered as a result of any action brought
-
-// by a third party) even if such damage or loss was
-
-// reasonably foreseeable or Xilinx had been advised of the
-
-// possibility of the same.
-
-//
-
-// CRITICAL APPLICATIONS
-
-// Xilinx products are not designed or intended to be fail-
-
-// safe, or for use in any application requiring fail-safe
-
-// performance, such as life-support or safety devices or
-
-// systems, Class III medical devices, nuclear facilities,
-
-// applications related to the deployment of airbags, or any
-
-// other applications that could lead to death, personal
-
-// injury, or severe property or environmental damage
-
-// (individually and collectively, "Critical
-
-// Applications"). Customer assumes the sole risk and
-
-// liability of any use of Xilinx products in Critical
-
-// Applications, subject only to applicable laws and
-
-// regulations governing limitations on product liability.
-
-//
-
-// THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS
-
-// PART OF THIS FILE AT ALL TIMES.
-
-//
-
-//*****************************************************************************
-
-//   ____  ____
-
-//  /   /\/   /
-
-// /___/  \  /    Vendor             : Xilinx
-
-// \   \   \/     Version            : 4.2
-
-//  \   \         Application        : MIG
-
-//  /   /         Filename           : sim_tb_top.v
-
-// /___/   /\     Date Last Modified : $Date: 2011/06/07 13:45:16 $
-
-// \   \  /  \    Date Created       : Tue Sept 21 2010
-
-//  \___\/\___\
-
-//
-
-// Device           : 7 Series
-
-// Design Name      : DDR3 SDRAM
-
-// Purpose          :
-
-//                   Top-level testbench for testing DDR3.
-
-//                   Instantiates:
-
-//                     1. IP_TOP (top-level representing FPGA, contains core,
-
-//                        clocking, built-in testbench/memory checker and other
-
-//                        support structures)
-
-//                     2. DDR3 Memory
-
-//                     3. Miscellaneous clock generation and reset logic
-
-//                     4. For ECC ON case inserts error on LSB bit
-
-//                        of data from DRAM to FPGA.
-
-// Reference        :
-
-// Revision History :
-
-//*****************************************************************************
-
-
-
 `timescale 1ps/100fs
 
 
@@ -1115,9 +967,34 @@ module sim_tb_top;
   localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
   localparam integer PRINT_CASE_MATRIX_VALUES = 1;
+  localparam integer CASE_DONE_TIMEOUT_CYCLES = 2000000;
+
+  localparam [2:0] CORE_S_IDLE    = 3'd0;
+  localparam [2:0] CORE_S_LOAD_A  = 3'd1;
+  localparam [2:0] CORE_S_LOAD_B  = 3'd2;
+  localparam [2:0] CORE_S_CLEAR   = 3'd3;
+  localparam [2:0] CORE_S_COMPUTE = 3'd4;
+
+  localparam [2:0] TILE_TS_IDLE       = 3'd0;
+  localparam [2:0] TILE_TS_INIT_TILE  = 3'd1;
+  localparam [2:0] TILE_TS_START_CORE = 3'd2;
+  localparam [2:0] TILE_TS_WAIT_CORE  = 3'd3;
+  localparam [2:0] TILE_TS_ACCUM      = 3'd4;
+  localparam [2:0] TILE_TS_WB_START   = 3'd5;
+  localparam [2:0] TILE_TS_WB_WAIT    = 3'd6;
+  localparam [2:0] TILE_TS_DONE       = 3'd7;
 
   reg [C_S_AXI_DATA_WIDTH-1:0] axi_test_rdata;
   reg                          axi_test_fail;
+
+  time    case_tb_preload_time   [0:NUM_CASES-1];
+  time    case_cfg_time          [0:NUM_CASES-1];
+  time    case_core_run_time     [0:NUM_CASES-1];
+  time    case_tb_readback_time  [0:NUM_CASES-1];
+  integer case_core_fetch_cycles [0:NUM_CASES-1];
+  integer case_core_compute_cycles [0:NUM_CASES-1];
+  integer case_core_writeback_cycles [0:NUM_CASES-1];
+  integer case_core_move_cycles  [0:NUM_CASES-1];
 
   // -------------------------
   // Test-pattern generators
@@ -1458,9 +1335,16 @@ module sim_tb_top;
     input integer m_dim;
     input integer k_dim;
     input integer n_dim;
+    output time cfg_elapsed;
+    output time core_run_elapsed;
+    output time readback_elapsed;
+    output integer fetch_cycles;
+    output integer compute_cycles;
+    output integer writeback_cycles;
     integer r;
     integer col_idx;
     integer poll_count;
+    integer timeout_cycles;
     integer seen_done_clear;
     integer seen_busy;
     integer mismatch_count;
@@ -1473,10 +1357,22 @@ module sim_tb_top;
     reg [31:0] cfg_m;
     reg [31:0] cfg_k;
     reg [31:0] cfg_n;
+    reg [2:0]  core_state;
+    reg [2:0]  tile_state;
+    time cfg_start_time;
+    time core_run_start_time;
+    time readback_start_time;
   begin
     $display("CASE%0d start M=%0d K=%0d N=%0d", tc_idx, m_dim, k_dim, n_dim);
+    cfg_elapsed      = 0;
+    core_run_elapsed = 0;
+    readback_elapsed = 0;
+    fetch_cycles     = 0;
+    compute_cycles   = 0;
+    writeback_cycles = 0;
 
     // Program matrix wrapper registers (word addresses and dims).
+    cfg_start_time = $time;
     matrix_cfg_write(32'h0000_0000, MATRIX_WORD_BASE_A); // reg_addr_a
     matrix_cfg_write(32'h0000_0004, MATRIX_WORD_BASE_B); // reg_addr_b
     matrix_cfg_write(32'h0000_0008, MATRIX_WORD_BASE_C); // reg_addr_c
@@ -1491,6 +1387,7 @@ module sim_tb_top;
     matrix_cfg_read(32'h0000_000C, cfg_m);
     matrix_cfg_read(32'h0000_0010, cfg_k);
     matrix_cfg_read(32'h0000_0014, cfg_n);
+    cfg_elapsed = $time - cfg_start_time;
     $display("CASE%0d cfg readback: A=%08h B=%08h C=%08h M=%0d K=%0d N=%0d",
              tc_idx, cfg_a, cfg_b, cfg_c, cfg_m, cfg_k, cfg_n);
 
@@ -1506,35 +1403,66 @@ module sim_tb_top;
     end
 
     // Start run.
+    core_run_start_time = $time;
     matrix_cfg_write(32'h0000_001C, 32'h0000_0001);      // start
 
-    // Poll status reg 0x20: bit[1]=done_latched, bit[0]=busy
+    // Measure core-side fetch / compute / writeback time by observing
+    // the internal tile/core FSMs cycle by cycle.
     status = 32'd0;
     status_prev = 32'hFFFF_FFFF;
     poll_count  = 0;
+    timeout_cycles = 0;
     seen_done_clear = 0;
     seen_busy       = 0;
-    while (((!status[1]) || (!seen_done_clear)) &&
-           (poll_count < CASE_DONE_TIMEOUT_POLLS)) begin
-      matrix_cfg_read(32'h0000_0020, status);
-      poll_count = poll_count + 1;
-      if (!status[1]) seen_done_clear = 1;
-      if (status[0])  seen_busy       = 1;
+    while ((!u_ip_top.u_matrix_top_wrapper.sys_done) &&
+           (timeout_cycles < CASE_DONE_TIMEOUT_CYCLES)) begin
+      @(posedge u_ip_top.clk);
+      timeout_cycles = timeout_cycles + 1;
 
-      if (status !== status_prev) begin
-        $display("CASE%0d status change: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
-                 tc_idx, status, status[0], status[1], poll_count, $time);
-        status_prev = status;
-      end
-      else if ((poll_count % CASE_STATUS_PRINT_EVERY) == 0) begin
-        $display("CASE%0d waiting done: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
-                 tc_idx, status, status[0], status[1], poll_count, $time);
+      core_state = u_ip_top.u_matrix_top_wrapper.u_core.u_core.state;
+      tile_state = u_ip_top.u_matrix_top_wrapper.u_core.t_state;
+
+      if ((core_state == CORE_S_LOAD_A) || (core_state == CORE_S_LOAD_B))
+        fetch_cycles = fetch_cycles + 1;
+      if (core_state == CORE_S_COMPUTE)
+        compute_cycles = compute_cycles + 1;
+      if ((tile_state == TILE_TS_WB_START) || (tile_state == TILE_TS_WB_WAIT))
+        writeback_cycles = writeback_cycles + 1;
+
+      if (u_ip_top.u_matrix_top_wrapper.sys_busy)
+        seen_busy = 1;
+
+      if ((timeout_cycles % CASE_STATUS_PRINT_EVERY) == 0) begin
+        $display("CASE%0d waiting core done: tile_state=%0d core_state=%0d busy=%0b cycle=%0d t=%0t",
+                 tc_idx, tile_state, core_state, u_ip_top.u_matrix_top_wrapper.sys_busy,
+                 timeout_cycles, $time);
       end
     end
 
-    if (!status[1] || !seen_done_clear) begin
-      $display("CASE%0d TIMEOUT waiting done: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
+    core_run_elapsed = $time - core_run_start_time;
+
+    if (timeout_cycles >= CASE_DONE_TIMEOUT_CYCLES) begin
+      $display("CASE%0d TIMEOUT waiting core done: busy=%0b cycle=%0d t=%0t",
+               tc_idx, u_ip_top.u_matrix_top_wrapper.sys_busy, timeout_cycles, $time);
+      axi_test_fail = 1'b1;
+      disable run_case;
+    end
+
+    // Read status reg 0x20 after completion: bit[1]=done_latched, bit[0]=busy
+    matrix_cfg_read(32'h0000_0020, status);
+    poll_count = poll_count + 1;
+    if (!status[1]) seen_done_clear = 1;
+    if (status[0])  seen_busy       = 1;
+
+    if (status !== status_prev) begin
+      $display("CASE%0d status change: status=%08h busy=%0b done=%0b poll=%0d t=%0t",
                tc_idx, status, status[0], status[1], poll_count, $time);
+      status_prev = status;
+    end
+
+    if (!status[1]) begin
+      $display("CASE%0d TEST FAILED: done_latched not observed after core completion, status=%08h",
+               tc_idx, status);
       axi_test_fail = 1'b1;
       disable run_case;
     end
@@ -1544,12 +1472,15 @@ module sim_tb_top;
                tc_idx);
     end
 
-    $display("CASE%0d matrix done", tc_idx);
+    $display("CASE%0d matrix done: core_run=%0t fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move_cycles=%0d",
+             tc_idx, core_run_elapsed, fetch_cycles, compute_cycles, writeback_cycles,
+             (fetch_cycles + writeback_cycles));
 
     // Readback C and compare
     mismatch_count = 0;
     if (PRINT_CASE_MATRIX_VALUES != 0)
       $display("CASE%0d C compare dump begin (per-row, format: exp/got)", tc_idx);
+    readback_start_time = $time;
     axi_master_idle();
     for (r = 0; r < m_dim; r = r + 1) begin
       for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
@@ -1575,11 +1506,12 @@ module sim_tb_top;
       end
     end
     axi_master_release();
+    readback_elapsed = $time - readback_start_time;
     if (PRINT_CASE_MATRIX_VALUES != 0)
       $display("CASE%0d C compare dump end", tc_idx);
 
     if (mismatch_count == 0)
-      $display("CASE%0d PASSED", tc_idx);
+      $display("CASE%0d PASSED: cfg=%0t tb_readback=%0t", tc_idx, cfg_elapsed, readback_elapsed);
     else
       $display("CASE%0d FAILED mismatch_count=%0d", tc_idx, mismatch_count);
   end
@@ -1594,9 +1526,27 @@ module sim_tb_top;
      integer m_dim;
      integer k_dim;
      integer n_dim;
+     integer sum_fetch_cycles;
+     integer sum_compute_cycles;
+     integer sum_writeback_cycles;
+     integer sum_move_cycles;
+     time    sum_tb_preload_time;
+     time    sum_cfg_time;
+     time    sum_core_run_time;
+     time    sum_tb_readback_time;
+     time    preload_start_time;
+     time    preload_elapsed;
 
      axi_test_fail  = 1'b0;
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
+     sum_fetch_cycles   = 0;
+     sum_compute_cycles = 0;
+     sum_writeback_cycles = 0;
+     sum_move_cycles    = 0;
+     sum_tb_preload_time = 0;
+     sum_cfg_time        = 0;
+     sum_core_run_time   = 0;
+     sum_tb_readback_time = 0;
 
      fork
         begin : run_matrix_multicase
@@ -1610,10 +1560,44 @@ module sim_tb_top;
 
            for (tc = 0; tc < NUM_CASES; tc = tc + 1) begin
              get_case_dims(tc, m_dim, k_dim, n_dim);
+             preload_start_time = $time;
              preload_case_data(tc, m_dim, k_dim, n_dim);
+             preload_elapsed = $time - preload_start_time;
+             case_tb_preload_time[tc] = preload_elapsed;
              $display("CASE%0d preload done: A@%h B@%h C@%h", tc, AXI_BASE_A, AXI_BASE_B, AXI_BASE_C);
-             run_case(tc, m_dim, k_dim, n_dim);
+             run_case(tc, m_dim, k_dim, n_dim,
+                      case_cfg_time[tc], case_core_run_time[tc], case_tb_readback_time[tc],
+                      case_core_fetch_cycles[tc], case_core_compute_cycles[tc],
+                      case_core_writeback_cycles[tc]);
+             case_core_move_cycles[tc] = case_core_fetch_cycles[tc] + case_core_writeback_cycles[tc];
+
+             sum_tb_preload_time = sum_tb_preload_time + case_tb_preload_time[tc];
+             sum_cfg_time        = sum_cfg_time + case_cfg_time[tc];
+             sum_core_run_time   = sum_core_run_time + case_core_run_time[tc];
+             sum_tb_readback_time = sum_tb_readback_time + case_tb_readback_time[tc];
+             sum_fetch_cycles    = sum_fetch_cycles + case_core_fetch_cycles[tc];
+             sum_compute_cycles  = sum_compute_cycles + case_core_compute_cycles[tc];
+             sum_writeback_cycles = sum_writeback_cycles + case_core_writeback_cycles[tc];
+             sum_move_cycles     = sum_move_cycles + case_core_move_cycles[tc];
+
+             $display("CASE%0d timing summary: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move/compute=%0f",
+                      tc,
+                      case_tb_preload_time[tc],
+                      case_cfg_time[tc],
+                      case_core_run_time[tc],
+                      case_tb_readback_time[tc],
+                      case_core_fetch_cycles[tc],
+                      case_core_compute_cycles[tc],
+                      case_core_writeback_cycles[tc],
+                      (case_core_compute_cycles[tc] != 0) ?
+                      ((1.0 * case_core_move_cycles[tc]) / case_core_compute_cycles[tc]) : 0.0);
            end
+
+           $display("MATRIX TIMING TOTAL: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t",
+                    sum_tb_preload_time, sum_cfg_time, sum_core_run_time, sum_tb_readback_time);
+           $display("MATRIX TIMING TOTAL CYCLES: fetch=%0d compute=%0d writeback=%0d move=%0d move/compute=%0f",
+                    sum_fetch_cycles, sum_compute_cycles, sum_writeback_cycles, sum_move_cycles,
+                    (sum_compute_cycles != 0) ? ((1.0 * sum_move_cycles) / sum_compute_cycles) : 0.0);
 
            if (!axi_test_fail)
              $display("TEST PASSED: MATRIX MULTI-CASE (%0d cases)", NUM_CASES);
