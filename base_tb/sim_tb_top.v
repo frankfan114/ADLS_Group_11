@@ -298,6 +298,94 @@ module sim_tb_top;
 
   localparam ERR_INSERT = (ECC_TEST == "ON") ? "OFF" : ECC ;
 
+  //***************************************************************************//
+  // Matrix Multi-Case Quick Edit Section
+  //   Edit case count / dimensions / A,B data patterns here first.
+  //***************************************************************************//
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_A = 27'd0;       // byte addr
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_B = 27'd4096;    // byte addr
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_C = 27'd8192;    // byte addr
+
+  localparam [31:0] MATRIX_WORD_BASE_A = 32'd0;
+  localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
+  localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
+
+  localparam integer NUM_CASES = 8;
+  localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
+  localparam integer CASE_STATUS_PRINT_EVERY = 20000;
+  localparam integer PRINT_CASE_MATRIX_VALUES = 1;
+
+  // Case index summary:
+  //   0: 8x8 x 8x8, A=identity,        B=1..64
+  //   1: 8x8 x 8x8, A=all zeros,       B=positive pseudo pattern
+  //   2: 8x8 x 8x8, A/B=signed pattern
+  //   3: 5x3 x 3x7, rectangular case
+  //   4: 1x1 x 1x1, scalar case
+  //   5: 8x1 x 1x8, K=1 edge case
+  //   6: 8x8 x 8x1, N=1 edge case
+  //   7: 3x8 x 8x5, mixed signed case
+  task get_case_dims;
+    input  integer tc_idx;
+    output integer m_dim;
+    output integer k_dim;
+    output integer n_dim;
+  begin
+    case (tc_idx)
+      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
+      4: begin m_dim = 1; k_dim = 1; n_dim = 1; end
+      5: begin m_dim = 8; k_dim = 1; n_dim = 8; end
+      6: begin m_dim = 8; k_dim = 8; n_dim = 1; end
+      7: begin m_dim = 3; k_dim = 8; n_dim = 5; end
+      default: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+    endcase
+  end
+  endtask
+
+  function [7:0] gen_a_elem;
+    input integer tc_idx;
+    input integer row_idx;
+    input integer k_idx;
+    integer t;
+  begin
+    case (tc_idx)
+      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
+      1: t = 0;                                     // All zeros
+      2: t = row_idx - k_idx;                       // Signed pattern
+      3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
+      4: t = 13;                                    // 1x1 scalar
+      5: t = row_idx - 3;                           // K=1 pattern
+      6: t = (row_idx * 2) - k_idx + 1;             // N=1 pattern
+      7: t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8; // Mixed signed
+      default: t = 0;
+    endcase
+    gen_a_elem = t[7:0];
+  end
+  endfunction
+
+  function [7:0] gen_b_elem;
+    input integer tc_idx;
+    input integer k_idx;
+    input integer col_idx;
+    integer t;
+  begin
+    case (tc_idx)
+      0: t = k_idx * 8 + col_idx + 1;               // 1..64
+      1: t = (k_idx * 11 + col_idx * 7 + 3) % 101;  // Positive pseudo pattern
+      2: t = k_idx - (2 * col_idx);                 // Signed pattern
+      3: t = (k_idx * 3) + col_idx - 5;             // Rectangular pattern
+      4: t = -7;                                    // 1x1 scalar
+      5: t = col_idx + 1;                           // K=1 pattern
+      6: t = (k_idx % 2) ? -2 : 3;                  // N=1 pattern
+      7: t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9; // Mixed signed
+      default: t = 0;
+    endcase
+    gen_b_elem = t[7:0];
+  end
+  endfunction
+
   
 
 
@@ -955,18 +1043,6 @@ module sim_tb_top;
   // Matrix multi-case end-to-end test
   //   flow: preload A/B -> start matrix -> readback C -> compare
   //***************************************************************************
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_A = 27'd0;       // byte addr
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_B = 27'd4096;    // byte addr
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_C = 27'd8192;    // byte addr
-
-  localparam [31:0] MATRIX_WORD_BASE_A = 32'd0;
-  localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
-  localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
-
-  localparam integer NUM_CASES = 8;
-  localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
-  localparam integer CASE_STATUS_PRINT_EVERY = 20000;
-  localparam integer PRINT_CASE_MATRIX_VALUES = 1;
   localparam integer CASE_DONE_TIMEOUT_CYCLES = 2000000;
 
   localparam [2:0] CORE_S_IDLE    = 3'd0;
@@ -995,51 +1071,6 @@ module sim_tb_top;
   integer case_core_compute_cycles [0:NUM_CASES-1];
   integer case_core_writeback_cycles [0:NUM_CASES-1];
   integer case_core_move_cycles  [0:NUM_CASES-1];
-
-  // -------------------------
-  // Test-pattern generators
-  // -------------------------
-  function [7:0] gen_a_elem;
-    input integer tc_idx;
-    input integer row_idx;
-    input integer k_idx;
-    integer t;
-  begin
-    case (tc_idx)
-      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
-      1: t = 0;                                     // All zeros
-      2: t = row_idx - k_idx;                       // Signed pattern
-      3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
-      4: t = 13;                                    // 1x1 scalar
-      5: t = row_idx - 3;                           // K=1 pattern
-      6: t = (row_idx * 2) - k_idx + 1;             // N=1 pattern
-      7: t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8; // Mixed signed
-      default: t = 0;
-    endcase
-    gen_a_elem = t[7:0];
-  end
-  endfunction
-
-  function [7:0] gen_b_elem;
-    input integer tc_idx;
-    input integer k_idx;
-    input integer col_idx;
-    integer t;
-  begin
-    case (tc_idx)
-      0: t = k_idx * 8 + col_idx + 1;               // 1..64
-      1: t = (k_idx * 11 + col_idx * 7 + 3) % 101;  // Positive pseudo pattern
-      2: t = k_idx - (2 * col_idx);                 // Signed pattern
-      3: t = (k_idx * 3) + col_idx - 5;             // Rectangular pattern
-      4: t = -7;                                    // 1x1 scalar
-      5: t = col_idx + 1;                           // K=1 pattern
-      6: t = (k_idx % 2) ? -2 : 3;                  // N=1 pattern
-      7: t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9; // Mixed signed
-      default: t = 0;
-    endcase
-    gen_b_elem = t[7:0];
-  end
-  endfunction
 
   function [31:0] calc_expected_elem;
     input integer tc_idx;
@@ -1249,26 +1280,6 @@ module sim_tb_top;
     reg_data = u_ip_top.matrix_bus_rdata;
     @(posedge u_ip_top.clk);
     force u_ip_top.matrix_bus_valid = 1'b0;
-  end
-  endtask
-
-  task get_case_dims;
-    input  integer tc_idx;
-    output integer m_dim;
-    output integer k_dim;
-    output integer n_dim;
-  begin
-    case (tc_idx)
-      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
-      4: begin m_dim = 1; k_dim = 1; n_dim = 1; end
-      5: begin m_dim = 8; k_dim = 1; n_dim = 8; end
-      6: begin m_dim = 8; k_dim = 8; n_dim = 1; end
-      7: begin m_dim = 3; k_dim = 8; n_dim = 5; end
-      default: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-    endcase
   end
   endtask
 

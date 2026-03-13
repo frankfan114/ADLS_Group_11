@@ -1,4 +1,4 @@
-[submodule "rtl"]
-	path = rtl
+[submodule "base"]
+	path = base
 	url = https://github.com/frankfan114/ADL_Group_11.git
 	branch = hardware
