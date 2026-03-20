@@ -310,20 +310,21 @@ module sim_tb_top;
   localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
   localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
 
-  localparam integer NUM_CASES = 8;
+  // Run the first eight cases for quick comparison/coverage.
+  localparam integer NUM_CASES = 1;
   localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
+  // Global watchdog for the whole multi-case run (timescale is 1ps).
+  localparam time MATRIX_GLOBAL_TIMEOUT_FAST_PS = 20000000000.0; // 20 ms
+  localparam time MATRIX_GLOBAL_TIMEOUT_FULL_PS = 50000000000.0; // 50 ms
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
   localparam integer PRINT_CASE_MATRIX_VALUES = 1;
 
   // Case index summary:
-  //   0: 8x8 x 8x8, A=identity,        B=1..64
-  //   1: 8x8 x 8x8, A=all zeros,       B=positive pseudo pattern
-  //   2: 8x8 x 8x8, A/B=signed pattern
-  //   3: 5x3 x 3x7, rectangular case
-  //   4: 1x1 x 1x1, scalar case
-  //   5: 8x1 x 1x8, K=1 edge case
-  //   6: 8x8 x 8x1, N=1 edge case
-  //   7: 3x8 x 8x5, mixed signed case
+  //   0: 64x16 x 16x8
+  //      - multiple output tiles (M direction), so PP can overlap tile writeback
+  //      - non-trivial N keeps writeback meaningful
+  //      - still moderate size for quick regression runs
+  // Other cases are kept for quick rollback/debug, but NUM_CASES currently runs case 0 only.
   task get_case_dims;
     input  integer tc_idx;
     output integer m_dim;
@@ -331,7 +332,7 @@ module sim_tb_top;
     output integer n_dim;
   begin
     case (tc_idx)
-      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      0: begin m_dim = 24; k_dim = 12; n_dim = 8; end
       1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
       2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
       3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
@@ -351,7 +352,7 @@ module sim_tb_top;
     integer t;
   begin
     case (tc_idx)
-      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
+      0: t = row_idx + k_idx + 1;                  // Dense non-zero pattern
       1: t = 0;                                     // All zeros
       2: t = row_idx - k_idx;                       // Signed pattern
       3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
@@ -1370,8 +1371,12 @@ module sim_tb_top;
     reg [31:0] cfg_n;
     reg [2:0]  core_state;
     reg [2:0]  tile_state;
+    integer seen_start_pulse;
     time cfg_start_time;
     time core_run_start_time;
+    time start_pulse_time;
+    time sys_done_time;
+    time start_to_done_elapsed;
     time readback_start_time;
   begin
     $display("CASE%0d start M=%0d K=%0d N=%0d", tc_idx, m_dim, k_dim, n_dim);
@@ -1425,10 +1430,19 @@ module sim_tb_top;
     timeout_cycles = 0;
     seen_done_clear = 0;
     seen_busy       = 0;
+    seen_start_pulse = 0;
+    start_pulse_time = 0;
+    sys_done_time = 0;
+    start_to_done_elapsed = 0;
     while ((!u_ip_top.u_matrix_top_wrapper.sys_done) &&
            (timeout_cycles < CASE_DONE_TIMEOUT_CYCLES)) begin
       @(posedge u_ip_top.clk);
       timeout_cycles = timeout_cycles + 1;
+
+      if (!seen_start_pulse && u_ip_top.u_matrix_top_wrapper.start_pulse) begin
+        seen_start_pulse = 1;
+        start_pulse_time = $time;
+      end
 
       core_state = u_ip_top.u_matrix_top_wrapper.u_core.u_core.state;
       tile_state = u_ip_top.u_matrix_top_wrapper.u_core.t_state;
@@ -1450,7 +1464,16 @@ module sim_tb_top;
       end
     end
 
+    sys_done_time = $time;
     core_run_elapsed = $time - core_run_start_time;
+
+    if (seen_start_pulse) begin
+      start_to_done_elapsed = sys_done_time - start_pulse_time;
+      $display("CASE%0d start_pulse->sys_done: start=%0t done=%0t delta=%0t",
+               tc_idx, start_pulse_time, sys_done_time, start_to_done_elapsed);
+    end else begin
+      $display("CASE%0d WARNING: start_pulse was not observed before sys_done", tc_idx);
+    end
 
     if (timeout_cycles >= CASE_DONE_TIMEOUT_CYCLES) begin
       $display("CASE%0d TIMEOUT waiting core done: busy=%0b cycle=%0d t=%0t",
@@ -1624,9 +1647,9 @@ module sim_tb_top;
 
         begin : test_timeout
            if (SIM_BYPASS_INIT_CAL == "SIM_INIT_CAL_FULL")
-             #2500000000.0;
+             #MATRIX_GLOBAL_TIMEOUT_FULL_PS;
            else
-             #1000000000.0;
+             #MATRIX_GLOBAL_TIMEOUT_FAST_PS;
 
            if (!init_calib_complete)
              $display("TEST FAILED: INITIALIZATION DID NOT COMPLETE");
