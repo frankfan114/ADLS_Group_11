@@ -310,20 +310,25 @@ module sim_tb_top;
   localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
   localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
 
-  localparam integer NUM_CASES = 8;
+  localparam integer NUM_CASES = 13;
   localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
   localparam integer PRINT_CASE_MATRIX_VALUES = 1;
 
   // Case index summary:
-  //   0: 8x8 x 8x8, A=identity,        B=1..64
-  //   1: 8x8 x 8x8, A=all zeros,       B=positive pseudo pattern
-  //   2: 8x8 x 8x8, A/B=signed pattern
-  //   3: 5x3 x 3x7, rectangular case
-  //   4: 1x1 x 1x1, scalar case
-  //   5: 8x1 x 1x8, K=1 edge case
-  //   6: 8x8 x 8x1, N=1 edge case
-  //   7: 3x8 x 8x5, mixed signed case
+  //   0 : 8x8  x 8x8 , identity sanity
+  //   1 : 8x8  x 8x8 , signed full-tile
+  //   2 : 5x3  x 3x7 , rectangular
+  //   3 : 1x1  x 1x1 , scalar
+  //   4 : 8x1  x 1x8 , K=1 edge
+  //   5 : 8x8  x 8x1 , N=1 edge
+  //   6 : 3x8  x 8x5 , mixed signed
+  //   7 : 10x7 x 7x9 , mixed tiling
+  //   8 : 16x7 x 7x19, larger multi-tile
+  //   9 : 9x13 x 13x5, multi-K partial tile
+  //   10: 32x8 x 8x8 , WS large-M reuse
+  //   11: 16x16 x 16x8, WS multi-K reuse
+  //   12: 16x8 x 8x16, WS multi-N reuse
   task get_case_dims;
     input  integer tc_idx;
     output integer m_dim;
@@ -331,14 +336,19 @@ module sim_tb_top;
     output integer n_dim;
   begin
     case (tc_idx)
-      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
-      4: begin m_dim = 1; k_dim = 1; n_dim = 1; end
-      5: begin m_dim = 8; k_dim = 1; n_dim = 8; end
-      6: begin m_dim = 8; k_dim = 8; n_dim = 1; end
-      7: begin m_dim = 3; k_dim = 8; n_dim = 5; end
+      0:  begin m_dim = 8;  k_dim = 8;  n_dim = 8;  end
+      1:  begin m_dim = 8;  k_dim = 8;  n_dim = 8;  end
+      2:  begin m_dim = 5;  k_dim = 3;  n_dim = 7;  end
+      3:  begin m_dim = 1;  k_dim = 1;  n_dim = 1;  end
+      4:  begin m_dim = 8;  k_dim = 1;  n_dim = 8;  end
+      5:  begin m_dim = 8;  k_dim = 8;  n_dim = 1;  end
+      6:  begin m_dim = 3;  k_dim = 8;  n_dim = 5;  end
+      7:  begin m_dim = 10; k_dim = 7;  n_dim = 9;  end
+      8:  begin m_dim = 16; k_dim = 7;  n_dim = 19; end
+      9:  begin m_dim = 9;  k_dim = 13; n_dim = 5;  end
+      10: begin m_dim = 32; k_dim = 8;  n_dim = 8;  end
+      11: begin m_dim = 16; k_dim = 16; n_dim = 8;  end
+      12: begin m_dim = 16; k_dim = 8;  n_dim = 16; end
       default: begin m_dim = 8; k_dim = 8; n_dim = 8; end
     endcase
   end
@@ -351,14 +361,19 @@ module sim_tb_top;
     integer t;
   begin
     case (tc_idx)
-      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
-      1: t = 0;                                     // All zeros
-      2: t = row_idx - k_idx;                       // Signed pattern
-      3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
-      4: t = 13;                                    // 1x1 scalar
-      5: t = row_idx - 3;                           // K=1 pattern
-      6: t = (row_idx * 2) - k_idx + 1;             // N=1 pattern
-      7: t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8; // Mixed signed
+      0:  t = (row_idx == k_idx) ? 1 : 0;                       // Identity
+      1:  t = row_idx - k_idx;                                   // Signed full-tile
+      2:  t = (row_idx * 2) - k_idx - 1;                         // Rectangular
+      3:  t = 13;                                                // 1x1 scalar
+      4:  t = row_idx - 3;                                       // K=1
+      5:  t = (row_idx * 2) - k_idx + 1;                         // N=1
+      6:  t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8;      // Mixed signed
+      7:  t = ((row_idx * 11) + (k_idx * 5) + 7) % 23 - 11;     // Mixed tiling
+      8:  t = ((row_idx * 13) + (k_idx * 7) + 5) % 31 - 15;     // Large multi-tile
+      9:  t = ((row_idx * 17) + (k_idx * 3) + 1) % 37 - 18;     // Multi-K
+      10: t = ((row_idx * 5) + (k_idx * 9) + 11) % 41 - 20;     // WS large-M
+      11: t = ((row_idx * 7) + (k_idx * 2) + 13) % 43 - 21;     // WS multi-K
+      12: t = ((row_idx * 19) + (k_idx * 4) + 3) % 47 - 23;     // WS multi-N
       default: t = 0;
     endcase
     gen_a_elem = t[7:0];
@@ -372,14 +387,19 @@ module sim_tb_top;
     integer t;
   begin
     case (tc_idx)
-      0: t = k_idx * 8 + col_idx + 1;               // 1..64
-      1: t = (k_idx * 11 + col_idx * 7 + 3) % 101;  // Positive pseudo pattern
-      2: t = k_idx - (2 * col_idx);                 // Signed pattern
-      3: t = (k_idx * 3) + col_idx - 5;             // Rectangular pattern
-      4: t = -7;                                    // 1x1 scalar
-      5: t = col_idx + 1;                           // K=1 pattern
-      6: t = (k_idx % 2) ? -2 : 3;                  // N=1 pattern
-      7: t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9; // Mixed signed
+      0:  t = k_idx * 8 + col_idx + 1;                          // 1..64
+      1:  t = k_idx - (2 * col_idx);                            // Signed full-tile
+      2:  t = (k_idx * 3) + col_idx - 5;                        // Rectangular
+      3:  t = -7;                                               // 1x1 scalar
+      4:  t = col_idx + 1;                                      // K=1
+      5:  t = (k_idx % 2) ? -2 : 3;                             // N=1
+      6:  t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9;      // Mixed signed
+      7:  t = ((k_idx * 5) + (col_idx * 11) + 3) % 23 - 11;    // Mixed tiling
+      8:  t = ((k_idx * 9) + (col_idx * 4) + 1) % 31 - 15;     // Large multi-tile
+      9:  t = ((k_idx * 6) + (col_idx * 13) + 7) % 37 - 18;    // Multi-K
+      10: t = ((k_idx * 8) + (col_idx * 3) + 5) % 41 - 20;     // WS large-M
+      11: t = ((k_idx * 10) + (col_idx * 5) + 9) % 43 - 21;    // WS multi-K
+      12: t = ((k_idx * 4) + (col_idx * 17) + 2) % 47 - 23;    // WS multi-N
       default: t = 0;
     endcase
     gen_b_elem = t[7:0];
@@ -1048,7 +1068,7 @@ module sim_tb_top;
   localparam [2:0] CORE_S_IDLE    = 3'd0;
   localparam [2:0] CORE_S_LOAD_A  = 3'd1;
   localparam [2:0] CORE_S_LOAD_B  = 3'd2;
-  localparam [2:0] CORE_S_CLEAR   = 3'd3;
+  localparam [2:0] CORE_S_START   = 3'd3;
   localparam [2:0] CORE_S_COMPUTE = 3'd4;
 
   localparam [2:0] TILE_TS_IDLE       = 3'd0;
@@ -1068,6 +1088,7 @@ module sim_tb_top;
   time    case_core_run_time     [0:NUM_CASES-1];
   time    case_tb_readback_time  [0:NUM_CASES-1];
   integer case_core_fetch_cycles [0:NUM_CASES-1];
+  integer case_core_load_b_cycles [0:NUM_CASES-1];
   integer case_core_compute_cycles [0:NUM_CASES-1];
   integer case_core_writeback_cycles [0:NUM_CASES-1];
   integer case_core_move_cycles  [0:NUM_CASES-1];
@@ -1350,6 +1371,7 @@ module sim_tb_top;
     output time core_run_elapsed;
     output time readback_elapsed;
     output integer fetch_cycles;
+    output integer load_b_cycles;
     output integer compute_cycles;
     output integer writeback_cycles;
     integer r;
@@ -1379,6 +1401,7 @@ module sim_tb_top;
     core_run_elapsed = 0;
     readback_elapsed = 0;
     fetch_cycles     = 0;
+    load_b_cycles    = 0;
     compute_cycles   = 0;
     writeback_cycles = 0;
 
@@ -1435,6 +1458,8 @@ module sim_tb_top;
 
       if ((core_state == CORE_S_LOAD_A) || (core_state == CORE_S_LOAD_B))
         fetch_cycles = fetch_cycles + 1;
+      if (core_state == CORE_S_LOAD_B)
+        load_b_cycles = load_b_cycles + 1;
       if (core_state == CORE_S_COMPUTE)
         compute_cycles = compute_cycles + 1;
       if ((tile_state == TILE_TS_WB_START) || (tile_state == TILE_TS_WB_WAIT))
@@ -1483,8 +1508,8 @@ module sim_tb_top;
                tc_idx);
     end
 
-    $display("CASE%0d matrix done: core_run=%0t fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move_cycles=%0d",
-             tc_idx, core_run_elapsed, fetch_cycles, compute_cycles, writeback_cycles,
+    $display("CASE%0d matrix done: core_run=%0t fetch_cycles=%0d load_b_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move_cycles=%0d",
+             tc_idx, core_run_elapsed, fetch_cycles, load_b_cycles, compute_cycles, writeback_cycles,
              (fetch_cycles + writeback_cycles));
 
     // Readback C and compare
@@ -1538,6 +1563,7 @@ module sim_tb_top;
      integer k_dim;
      integer n_dim;
      integer sum_fetch_cycles;
+     integer sum_load_b_cycles;
      integer sum_compute_cycles;
      integer sum_writeback_cycles;
      integer sum_move_cycles;
@@ -1551,6 +1577,7 @@ module sim_tb_top;
      axi_test_fail  = 1'b0;
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
      sum_fetch_cycles   = 0;
+     sum_load_b_cycles  = 0;
      sum_compute_cycles = 0;
      sum_writeback_cycles = 0;
      sum_move_cycles    = 0;
@@ -1578,7 +1605,7 @@ module sim_tb_top;
              $display("CASE%0d preload done: A@%h B@%h C@%h", tc, AXI_BASE_A, AXI_BASE_B, AXI_BASE_C);
              run_case(tc, m_dim, k_dim, n_dim,
                       case_cfg_time[tc], case_core_run_time[tc], case_tb_readback_time[tc],
-                      case_core_fetch_cycles[tc], case_core_compute_cycles[tc],
+                      case_core_fetch_cycles[tc], case_core_load_b_cycles[tc], case_core_compute_cycles[tc],
                       case_core_writeback_cycles[tc]);
              case_core_move_cycles[tc] = case_core_fetch_cycles[tc] + case_core_writeback_cycles[tc];
 
@@ -1587,17 +1614,19 @@ module sim_tb_top;
              sum_core_run_time   = sum_core_run_time + case_core_run_time[tc];
              sum_tb_readback_time = sum_tb_readback_time + case_tb_readback_time[tc];
              sum_fetch_cycles    = sum_fetch_cycles + case_core_fetch_cycles[tc];
+             sum_load_b_cycles   = sum_load_b_cycles + case_core_load_b_cycles[tc];
              sum_compute_cycles  = sum_compute_cycles + case_core_compute_cycles[tc];
              sum_writeback_cycles = sum_writeback_cycles + case_core_writeback_cycles[tc];
              sum_move_cycles     = sum_move_cycles + case_core_move_cycles[tc];
 
-             $display("CASE%0d timing summary: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move/compute=%0f",
+             $display("CASE%0d timing summary: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t fetch_cycles=%0d load_b_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move/compute=%0f",
                       tc,
                       case_tb_preload_time[tc],
                       case_cfg_time[tc],
                       case_core_run_time[tc],
                       case_tb_readback_time[tc],
                       case_core_fetch_cycles[tc],
+                      case_core_load_b_cycles[tc],
                       case_core_compute_cycles[tc],
                       case_core_writeback_cycles[tc],
                       (case_core_compute_cycles[tc] != 0) ?
@@ -1606,8 +1635,8 @@ module sim_tb_top;
 
            $display("MATRIX TIMING TOTAL: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t",
                     sum_tb_preload_time, sum_cfg_time, sum_core_run_time, sum_tb_readback_time);
-           $display("MATRIX TIMING TOTAL CYCLES: fetch=%0d compute=%0d writeback=%0d move=%0d move/compute=%0f",
-                    sum_fetch_cycles, sum_compute_cycles, sum_writeback_cycles, sum_move_cycles,
+           $display("MATRIX TIMING TOTAL CYCLES: fetch=%0d load_b=%0d compute=%0d writeback=%0d move=%0d move/compute=%0f",
+                    sum_fetch_cycles, sum_load_b_cycles, sum_compute_cycles, sum_writeback_cycles, sum_move_cycles,
                     (sum_compute_cycles != 0) ? ((1.0 * sum_move_cycles) / sum_compute_cycles) : 0.0);
 
            if (!axi_test_fail)

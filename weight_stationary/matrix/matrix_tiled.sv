@@ -1,13 +1,14 @@
 `timescale 1ns/1ps
 module matrix_tiled #(
-    parameter int DATA_W     = 8,
-    parameter int ACC_W      = 32,
-    parameter int MAX_M      = 8,
-    parameter int MAX_K      = 8,
-    parameter int MAX_N      = 8,
-    parameter int SRAM_W     = 32,
-    parameter int ADDR_WIDTH = 32,
-    parameter int PE_PIPE    = 1
+    parameter int DATA_W         = 8,
+    parameter int ACC_W          = 32,
+    parameter int MAX_M          = 8,
+    parameter int MAX_K          = 8,
+    parameter int MAX_N          = 8,
+    parameter int SRAM_W         = 32,
+    parameter int ADDR_WIDTH     = 32,
+    parameter int PE_PIPE        = 1,
+    parameter int ACC_TILE_SLOTS = 256
 )(
     input  logic                    clk,
     input  logic                    rst_n,
@@ -35,7 +36,8 @@ module matrix_tiled #(
     localparam int TILE_M = MAX_M;
     localparam int TILE_K = MAX_K;
     localparam int TILE_N = MAX_N;
-
+    localparam int TOTAL_ELEMS_TILE = MAX_M * MAX_N;
+    localparam int TILE_ACC_BITS = ACC_W * MAX_M * MAX_N;
     localparam int ELEMS_PER_WORD = SRAM_W / DATA_W;
     localparam int ELEMS_SHIFT  = $clog2(ELEMS_PER_WORD);
     localparam int TILE_M_SHIFT = $clog2(TILE_M);
@@ -61,10 +63,12 @@ module matrix_tiled #(
 
     logic [15:0] tile_m_idx, tile_n_idx, tile_k_idx;
     logic [15:0] tile_m_idx_n, tile_n_idx_n, tile_k_idx_n;
+    logic [15:0] wb_tile_m_idx, wb_tile_m_idx_n;
 
     logic [$clog2(MAX_M+1)-1:0] cur_m_num;
     logic [$clog2(MAX_K+1)-1:0] cur_k_num;
     logic [$clog2(MAX_N+1)-1:0] cur_n_num;
+    logic [$clog2(MAX_M+1)-1:0] wb_cur_m_num;
 
     always_comb begin
         if (num_tile_m == 0)
@@ -81,6 +85,11 @@ module matrix_tiled #(
             cur_k_num = '0;
         else
             cur_k_num = (tile_k_idx == num_tile_k - 1) ? (glob_k_num - tile_k_idx * TILE_K) : TILE_K;
+
+        if (num_tile_m == 0)
+            wb_cur_m_num = '0;
+        else
+            wb_cur_m_num = (wb_tile_m_idx == num_tile_m - 1) ? (glob_m_num - wb_tile_m_idx * TILE_M) : TILE_M;
     end
 
     typedef enum logic [2:0] {
@@ -98,21 +107,11 @@ module matrix_tiled #(
 
     logic [ADDR_WIDTH-1:0] base_addr_A_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_B_tile_r;
-    logic [ADDR_WIDTH-1:0] base_addr_C_tile_r;
-
-    logic init_keep_accum;
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            init_keep_accum <= 1'b0;
-        else
-            init_keep_accum <= (t_state == TS_ACCUM) && (t_state_n == TS_INIT_TILE);
-    end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             base_addr_A_tile_r <= '0;
             base_addr_B_tile_r <= '0;
-            base_addr_C_tile_r <= '0;
         end else if (t_state == TS_INIT_TILE) begin
             base_addr_A_tile_r <= base_addr_A
                                + (tile_m_idx * TILE_M) * row_stride_A_words
@@ -121,10 +120,6 @@ module matrix_tiled #(
             base_addr_B_tile_r <= base_addr_B
                                + (tile_k_idx * TILE_K) * row_stride_B_words
                                + ((tile_n_idx * TILE_N) >> ELEMS_SHIFT);
-
-            base_addr_C_tile_r <= base_addr_C
-                               + (tile_m_idx * TILE_M) * glob_n_num
-                               + (tile_n_idx * TILE_N);
         end
     end
 
@@ -134,7 +129,8 @@ module matrix_tiled #(
     logic [31:0] core_mem_addr;
     logic [31:0] core_mem_wdata;
     logic [3:0]  core_mem_wstrb;
-    logic [ACC_W*MAX_M*MAX_N-1:0] core_partial_flat;
+    logic [TILE_ACC_BITS-1:0] core_partial_flat;
+    logic [TILE_ACC_BITS-1:0] core_partial_flat_r;
 
     matrix_core #(
         .DATA_W     (DATA_W),
@@ -173,53 +169,46 @@ module matrix_tiled #(
         .core_done    (core_done)
     );
 
-    // Reuse B only when the whole B matrix tile stays unchanged while M tiles advance.
-    assign core_allow_b_reuse = (tile_m_idx != 16'd0)
-                             && (num_tile_k == 16'd1)
-                             && (num_tile_n == 16'd1);
+    // In system-level WS mode, one B tile is reused across all M tiles for a fixed (K, N) pair.
+    assign core_allow_b_reuse = (tile_m_idx != 16'd0);
 
-    localparam int TOTAL_ELEMS_TILE = MAX_M * MAX_N;
-    logic [ACC_W*MAX_M*MAX_N-1:0] c_accum_flat;
-    logic                         accum_valid;
+    logic [TILE_ACC_BITS-1:0] c_tile_spad [0:ACC_TILE_SLOTS-1];
+    logic [TILE_ACC_BITS-1:0] wb_partial_flat;
     integer ii;
 
-    logic [ACC_W*MAX_M*MAX_N-1:0] core_partial_flat_r;
-    logic                         k_last_done_r;
-
-    wire last_tk_curr = (tile_k_idx == (num_tile_k - 1));
+    wire last_tm = (num_tile_m != 0) && (tile_m_idx == (num_tile_m - 1));
+    wire last_tk = (num_tile_k != 0) && (tile_k_idx == (num_tile_k - 1));
+    wire last_tn = (num_tile_n != 0) && (tile_n_idx == (num_tile_n - 1));
+    wire last_wb_tm = (num_tile_m != 0) && (wb_tile_m_idx == (num_tile_m - 1));
+    wire first_tk = (tile_k_idx == 16'd0);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             core_partial_flat_r <= '0;
-            k_last_done_r       <= 1'b0;
         end else if ((t_state == TS_WAIT_CORE) && core_done) begin
             core_partial_flat_r <= core_partial_flat;
-            k_last_done_r       <= last_tk_curr;
         end
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            accum_valid  <= 1'b0;
-            c_accum_flat <= '0;
-        end else begin
-            if ((t_state == TS_INIT_TILE) && !init_keep_accum) begin
-                accum_valid  <= 1'b0;
-                c_accum_flat <= '0;
-            end else if (t_state == TS_ACCUM) begin
-                if (!accum_valid) begin
-                    for (ii = 0; ii < TOTAL_ELEMS_TILE; ii++) begin
-                        c_accum_flat[ii*ACC_W +: ACC_W] <= core_partial_flat_r[ii*ACC_W +: ACC_W];
-                    end
-                    accum_valid <= 1'b1;
-                end else begin
-                    for (ii = 0; ii < TOTAL_ELEMS_TILE; ii++) begin
-                        c_accum_flat[ii*ACC_W +: ACC_W] <=
-                            c_accum_flat[ii*ACC_W +: ACC_W] + core_partial_flat_r[ii*ACC_W +: ACC_W];
-                    end
+            for (ii = 0; ii < ACC_TILE_SLOTS; ii++) begin
+                c_tile_spad[ii] <= '0;
+            end
+        end else if (t_state == TS_ACCUM) begin
+            if (first_tk) begin
+                c_tile_spad[tile_m_idx] <= core_partial_flat_r;
+            end else begin
+                for (ii = 0; ii < TOTAL_ELEMS_TILE; ii++) begin
+                    c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] <=
+                        c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] + core_partial_flat_r[ii*ACC_W +: ACC_W];
                 end
             end
         end
+    end
+
+    always_comb begin
+        wb_partial_flat = c_tile_spad[wb_tile_m_idx];
     end
 
     logic wb_start;
@@ -228,6 +217,13 @@ module matrix_tiled #(
     logic [SRAM_W-1:0]     wb_wdata;
     logic [3:0]            wb_wstrb;
     logic wb_busy, wb_done;
+    logic [ADDR_WIDTH-1:0] wb_base_addr_word;
+
+    always_comb begin
+        wb_base_addr_word = base_addr_C
+                          + (wb_tile_m_idx * TILE_M) * glob_n_num
+                          + (tile_n_idx * TILE_N);
+    end
 
     matrix_writeback #(
         .ACC_W      (ACC_W),
@@ -240,11 +236,11 @@ module matrix_tiled #(
         .rst_n                    (rst_n),
 
         .writeback_start          (wb_start),
-        .writeback_base_addr      (base_addr_C_tile_r),
-        .writeback_mat_m_num      (cur_m_num),
+        .writeback_base_addr      (wb_base_addr_word),
+        .writeback_mat_m_num      (wb_cur_m_num),
         .writeback_mat_n_num      (cur_n_num),
 
-        .writeback_partial_sum_flat(c_accum_flat),
+        .writeback_partial_sum_flat(wb_partial_flat),
 
         .wb_valid                 (wb_valid),
         .wb_ready                 (wb_ready),
@@ -259,56 +255,62 @@ module matrix_tiled #(
     );
 
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
+        if (!rst_n) begin
             t_state <= TS_IDLE;
-        else
+        end else begin
             t_state <= t_state_n;
+        end
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            tile_m_idx <= 16'd0;
-            tile_n_idx <= 16'd0;
-            tile_k_idx <= 16'd0;
+            tile_m_idx    <= 16'd0;
+            tile_n_idx    <= 16'd0;
+            tile_k_idx    <= 16'd0;
+            wb_tile_m_idx <= 16'd0;
         end else begin
-            tile_m_idx <= tile_m_idx_n;
-            tile_n_idx <= tile_n_idx_n;
-            tile_k_idx <= tile_k_idx_n;
+            tile_m_idx    <= tile_m_idx_n;
+            tile_n_idx    <= tile_n_idx_n;
+            tile_k_idx    <= tile_k_idx_n;
+            wb_tile_m_idx <= wb_tile_m_idx_n;
         end
     end
 
-    logic last_tm, last_tn, last_tile_mn;
     always_comb begin
-        last_tm      = (tile_m_idx == (num_tile_m - 1));
-        last_tn      = (tile_n_idx == (num_tile_n - 1));
-        last_tile_mn = last_tm && last_tn;
-
-        tile_m_idx_n = tile_m_idx;
-        tile_n_idx_n = tile_n_idx;
-        tile_k_idx_n = tile_k_idx;
+        tile_m_idx_n    = tile_m_idx;
+        tile_n_idx_n    = tile_n_idx;
+        tile_k_idx_n    = tile_k_idx;
+        wb_tile_m_idx_n = wb_tile_m_idx;
 
         case (t_state)
             TS_IDLE: if (start) begin
-                tile_m_idx_n = 16'd0;
-                tile_n_idx_n = 16'd0;
-                tile_k_idx_n = 16'd0;
+                tile_m_idx_n    = 16'd0;
+                tile_n_idx_n    = 16'd0;
+                tile_k_idx_n    = 16'd0;
+                wb_tile_m_idx_n = 16'd0;
             end
 
-            TS_WAIT_CORE: if (core_done) begin
-                if (!last_tk_curr)
+            TS_ACCUM: begin
+                if (!last_tm) begin
+                    tile_m_idx_n = tile_m_idx + 16'd1;
+                end else if (!last_tk) begin
+                    tile_m_idx_n = 16'd0;
                     tile_k_idx_n = tile_k_idx + 16'd1;
-                else
-                    tile_k_idx_n = 16'd0;
+                end else begin
+                    tile_m_idx_n    = 16'd0;
+                    tile_k_idx_n    = 16'd0;
+                    wb_tile_m_idx_n = 16'd0;
+                end
             end
 
             TS_WB_WAIT: if (wb_done) begin
-                if (!last_tile_mn) begin
-                    if (last_tn) begin
-                        tile_n_idx_n = 16'd0;
-                        tile_m_idx_n = tile_m_idx + 16'd1;
-                    end else begin
-                        tile_n_idx_n = tile_n_idx + 16'd1;
-                    end
+                if (!last_wb_tm) begin
+                    wb_tile_m_idx_n = wb_tile_m_idx + 16'd1;
+                end else if (!last_tn) begin
+                    tile_n_idx_n    = tile_n_idx + 16'd1;
+                    tile_m_idx_n    = 16'd0;
+                    tile_k_idx_n    = 16'd0;
+                    wb_tile_m_idx_n = 16'd0;
                 end
             end
 
@@ -346,10 +348,10 @@ module matrix_tiled #(
             end
 
             TS_ACCUM: begin
-                if (!k_last_done_r)
-                    t_state_n = TS_INIT_TILE;
-                else
+                if (last_tm && last_tk)
                     t_state_n = TS_WB_START;
+                else
+                    t_state_n = TS_INIT_TILE;
             end
 
             TS_WB_START: begin
@@ -359,10 +361,14 @@ module matrix_tiled #(
 
             TS_WB_WAIT: begin
                 if (wb_done) begin
-                    if (last_tile_mn)
-                        t_state_n = TS_DONE;
-                    else
-                        t_state_n = TS_INIT_TILE;
+                    if (last_wb_tm) begin
+                        if (last_tn)
+                            t_state_n = TS_DONE;
+                        else
+                            t_state_n = TS_INIT_TILE;
+                    end else begin
+                        t_state_n = TS_WB_START;
+                    end
                 end
             end
 
@@ -370,7 +376,9 @@ module matrix_tiled #(
                 t_state_n = TS_IDLE;
             end
 
-            default: t_state_n = TS_IDLE;
+            default: begin
+                t_state_n = TS_IDLE;
+            end
         endcase
     end
 
@@ -382,7 +390,6 @@ module matrix_tiled #(
         mem_addr  = 32'h0;
         mem_wdata = 32'h0;
         mem_wstrb = 4'b0000;
-
         wb_ready  = 1'b0;
 
         if ((t_state == TS_INIT_TILE) ||
