@@ -12,6 +12,9 @@ weight_stationary/simulation/sim_build_matrix_tiled
 # python cache
 __pycache__/
 
-benchmark\sim_build_ws
+benchmark/sim_build_ws
 
-benchmark\sim_build_os
+benchmark/sim_build_os
+benchmark_in_vivado/benchmark_results.csv
+benchmark_in_vivado/benchmark_results.json
+benchmark_in_vivado/benchmark_results_from_log.csv
