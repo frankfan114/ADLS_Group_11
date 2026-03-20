@@ -11,3 +11,7 @@ weight_stationary/simulation/matrix_wrapper_results.xml
 weight_stationary/simulation/sim_build_matrix_tiled
 # python cache
 __pycache__/
+
+benchmark\sim_build_ws
+
+benchmark\sim_build_os
