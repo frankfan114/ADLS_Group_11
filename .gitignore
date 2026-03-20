@@ -8,5 +8,6 @@ weight_stationary/simulation/matrix_top_wrapper_ws_check.vvp
 # results
 weight_stationary/simulation/matrix_wrapper_results.xml
 
+weight_stationary/simulation/sim_build_matrix_tiled
 # python cache
 __pycache__/
