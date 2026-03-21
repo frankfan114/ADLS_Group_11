@@ -1,4 +1,0 @@
-[submodule "output_stationary"]
-	path = output_stationary
-	url = https://github.com/frankfan114/ADL_Group_11.git
-	branch = hardware
