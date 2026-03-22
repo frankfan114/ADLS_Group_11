@@ -1,0 +1,65 @@
+{
+  "description": "Five (quantized model, layer) pairs for hardware acceleration; each layer from a specific QAT checkpoint.",
+  "layers": [
+    {
+      "index": 1,
+      "source_checkpoint": "ResNet18_w4_qat.pt",
+      "model": "ResNet18",
+      "qat_bit_width": 4,
+      "layer_name": "fc",
+      "layer_id": "ResNet18#L0#fc",
+      "weight_key": "fc.weight",
+      "bias_key": "fc.bias",
+      "weight_shape": [10, 512],
+      "reason": "4-bit is the most aggressive QAT for this model; the single FC is sensitivity-critical. Represents low-bit CNN classifier head for strong compression."
+    },
+    {
+      "index": 2,
+      "source_checkpoint": "ResNet50_w8_qat.pt",
+      "model": "ResNet50",
+      "qat_bit_width": 8,
+      "layer_name": "fc",
+      "layer_id": "ResNet50#L0#fc",
+      "weight_key": "fc.weight",
+      "bias_key": "fc.bias",
+      "weight_shape": [10, 2048],
+      "reason": "8-bit common deployment; ResNet50 fc is 4x larger than ResNet18. Represents mid-bit large CNN classifier and bandwidth/compute stress."
+    },
+    {
+      "index": 3,
+      "source_checkpoint": "BERT_tiny_w4_qat.pt",
+      "model": "BERT-tiny",
+      "qat_bit_width": 4,
+      "layer_name": "bert.encoder.layer.0.attention.self.query",
+      "layer_id": "BERT-tiny#L3#bert.encoder.layer.0.attention.self.query",
+      "weight_key": "bert.encoder.layer.0.attention.self.query.weight",
+      "bias_key": "bert.encoder.layer.0.attention.self.query.bias",
+      "weight_shape": [128, 128],
+      "reason": "4-bit QAT on the most sensitivity-critical layer (drop ~0.74). Represents low-bit Transformer attention; motivates mixed-precision or higher bit for attention."
+    },
+    {
+      "index": 4,
+      "source_checkpoint": "BERT_tiny_w8_qat.pt",
+      "model": "BERT-tiny",
+      "qat_bit_width": 8,
+      "layer_name": "bert.encoder.layer.0.intermediate.dense",
+      "layer_id": "BERT-tiny#L7#bert.encoder.layer.0.intermediate.dense",
+      "weight_key": "bert.encoder.layer.0.intermediate.dense.weight",
+      "bias_key": "bert.encoder.layer.0.intermediate.dense.bias",
+      "weight_shape": [512, 128],
+      "reason": "8-bit QAT on large FFN expansion (65K params); quantization-tolerant (drop ~-0.08). Represents mid-bit large FFN where aggressive quantization is safe."
+    },
+    {
+      "index": 5,
+      "source_checkpoint": "BERT_tiny_w32_qat.pt",
+      "model": "BERT-tiny",
+      "qat_bit_width": 32,
+      "layer_name": "classifier",
+      "layer_id": "BERT-tiny#L16#classifier",
+      "weight_key": "classifier.weight",
+      "bias_key": "classifier.bias",
+      "weight_shape": [2, 128],
+      "reason": "32-bit QAT is effectively full-precision; tiny classifier (256 params), negligible sensitivity. Represents high-bit tiny task head as control or minimal-precision datapath."
+    }
+  ]
+}

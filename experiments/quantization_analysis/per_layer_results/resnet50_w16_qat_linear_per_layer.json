@@ -1,0 +1,41 @@
+{
+  "model": "ResNet50",
+  "dataset": "cifar10",
+  "focus": "linear",
+  "total_linear_layers": 1,
+  "quantized": true,
+  "bit_width": 16,
+  "variant": "qat",
+  "checkpoint": "ResNet50_w16_qat.pt",
+  "calibration_batches": 8,
+  "linear_layers": [
+    {
+      "layer_index": 0,
+      "name": "fc",
+      "graph_node_name": "fc",
+      "weight_shape": [
+        10,
+        2048
+      ],
+      "weight_min": -0.716748833656311,
+      "weight_max": 0.238067165017128,
+      "weight_mean": -0.007982931099832058,
+      "weight_std": 0.04189082607626915,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 9.765625e-05,
+      "activation_shape": [
+        64,
+        10
+      ],
+      "activation_min": -11.51990795135498,
+      "activation_max": 10.99666690826416,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet50",
+      "layer_id": "ResNet50#L0#fc"
+    }
+  ],
+  "schema_note": "per_layer_profile. activation_min/max/shape/sparsity null when calibration_batches=0. activation_sparsity_near_zero uses activation_near_zero_thr from run.",
+  "activation_near_zero_threshold": 1e-06
+}

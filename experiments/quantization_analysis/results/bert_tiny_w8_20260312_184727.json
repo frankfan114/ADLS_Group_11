@@ -1,0 +1,17 @@
+{
+  "model": "BERT-tiny",
+  "checkpoint": "prajjwal1/bert-tiny",
+  "dataset": "imdb",
+  "layer_types": [
+    "linear"
+  ],
+  "bit_width": 8,
+  "frac_width": 4,
+  "scheme": "integer",
+  "baseline_accuracy": 0.7534,
+  "ptq_accuracy": 0.75404,
+  "qat_accuracy": 0.7738,
+  "train_epochs": 20,
+  "qat_epochs": 3,
+  "timestamp": "2026-03-12T18:47:27.262327"
+}

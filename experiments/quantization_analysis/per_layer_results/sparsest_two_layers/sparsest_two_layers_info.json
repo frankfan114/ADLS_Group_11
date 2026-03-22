@@ -1,0 +1,119 @@
+{
+  "title": "Two sparsest layers (activation sparsity) + exported weights",
+  "layer": "layer4.1.conv3",
+  "model": "ResNet50",
+  "layers": [
+    {
+      "profile_source": "resnet50_w4_qat_conv_per_layer.json",
+      "checkpoint": "ResNet50_w4_qat.pt",
+      "layer_name": "layer4.1.conv3",
+      "rank_note": "Among all per_layer_results profiles, highest activation_sparsity_zero (calibration).",
+      "profile_layer": {
+        "layer_index": 98,
+        "name": "layer4.1.conv3",
+        "graph_node_name": "layer4_1_conv3",
+        "weight_shape": [
+          2048,
+          512,
+          1,
+          1
+        ],
+        "in_channels": 512,
+        "out_channels": 2048,
+        "kernel_size": [
+          1,
+          1
+        ],
+        "stride": [
+          1,
+          1
+        ],
+        "padding": [
+          0,
+          0
+        ],
+        "dilation": [
+          1,
+          1
+        ],
+        "groups": 1,
+        "has_bias": false,
+        "weight_min": -0.4169250428676605,
+        "weight_max": 0.3709714710712433,
+        "weight_mean": -0.00653199665248394,
+        "weight_std": 0.05803747475147247,
+        "weight_sparsity_zero": 0.0,
+        "weight_sparsity_near_zero": 1.52587890625e-05,
+        "activation_shape": [
+          64,
+          2048,
+          1,
+          1
+        ],
+        "activation_min": -0.009562373161315918,
+        "activation_max": 0.01428811252117157,
+        "activation_sparsity_zero": 0.9385433197021484,
+        "activation_sparsity_near_zero": 0.9385433197021484,
+        "sensitivity_accuracy_drop": null,
+        "model_name": "ResNet50",
+        "layer_id": "ResNet50#C98#layer4.1.conv3"
+      }
+    },
+    {
+      "profile_source": "resnet50_w16_qat_conv_per_layer.json",
+      "checkpoint": "ResNet50_w16_qat.pt",
+      "layer_name": "layer4.1.conv3",
+      "rank_note": "Among all per_layer_results profiles, highest activation_sparsity_zero (calibration).",
+      "profile_layer": {
+        "layer_index": 98,
+        "name": "layer4.1.conv3",
+        "graph_node_name": "layer4_1_conv3",
+        "weight_shape": [
+          2048,
+          512,
+          1,
+          1
+        ],
+        "in_channels": 512,
+        "out_channels": 2048,
+        "kernel_size": [
+          1,
+          1
+        ],
+        "stride": [
+          1,
+          1
+        ],
+        "padding": [
+          0,
+          0
+        ],
+        "dilation": [
+          1,
+          1
+        ],
+        "groups": 1,
+        "has_bias": false,
+        "weight_min": -0.4220941662788391,
+        "weight_max": 0.36896488070487976,
+        "weight_mean": -0.0070691099390387535,
+        "weight_std": 0.05758858099579811,
+        "weight_sparsity_zero": 0.0,
+        "weight_sparsity_near_zero": 1.33514404296875e-05,
+        "activation_shape": [
+          64,
+          2048,
+          1,
+          1
+        ],
+        "activation_min": -0.044141702353954315,
+        "activation_max": 0.052401505410671234,
+        "activation_sparsity_zero": 0.462890625,
+        "activation_sparsity_near_zero": 0.4642190933227539,
+        "sensitivity_accuracy_drop": null,
+        "model_name": "ResNet50",
+        "layer_id": "ResNet50#C98#layer4.1.conv3"
+      }
+    }
+  ]
+}

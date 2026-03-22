@@ -1,0 +1,472 @@
+{
+  "model": "BERT-tiny",
+  "dataset": "imdb",
+  "focus": "linear",
+  "total_linear_layers": 17,
+  "quantized": true,
+  "bit_width": 32,
+  "variant": "qat",
+  "checkpoint": "BERT_tiny_w32_qat.pt",
+  "calibration_batches": 8,
+  "linear_layers": [
+    {
+      "layer_index": 0,
+      "name": "bert.embeddings.word_embeddings",
+      "graph_node_name": "bert_embeddings_word_embeddings",
+      "weight_shape": [
+        30522,
+        128
+      ],
+      "weight_min": -0.6177701950073242,
+      "weight_max": 0.585390031337738,
+      "weight_mean": 0.003083648858591914,
+      "weight_std": 0.062464989721775055,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 1.3310071423890964e-05,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -0.6177701950073242,
+      "activation_max": 0.5251227021217346,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 9.059906005859375e-06,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L0#bert.embeddings.word_embeddings"
+    },
+    {
+      "layer_index": 1,
+      "name": "bert.embeddings.position_embeddings",
+      "graph_node_name": "bert_embeddings_position_embeddings",
+      "weight_shape": [
+        512,
+        128
+      ],
+      "weight_min": -0.6365447044372559,
+      "weight_max": 0.1880917102098465,
+      "weight_mean": 6.767224112991244e-05,
+      "weight_std": 0.03481866046786308,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 6.103515625e-05,
+      "activation_shape": [
+        1,
+        128,
+        128
+      ],
+      "activation_min": -0.6365447044372559,
+      "activation_max": 0.18458294868469238,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L1#bert.embeddings.position_embeddings"
+    },
+    {
+      "layer_index": 2,
+      "name": "bert.embeddings.token_type_embeddings",
+      "graph_node_name": "bert_embeddings_token_type_embeddings",
+      "weight_shape": [
+        2,
+        128
+      ],
+      "weight_min": -0.15965953469276428,
+      "weight_max": 0.1685863733291626,
+      "weight_mean": -0.001432386226952076,
+      "weight_std": 0.022764747962355614,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -0.15087465941905975,
+      "activation_max": 0.09621159732341766,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L2#bert.embeddings.token_type_embeddings"
+    },
+    {
+      "layer_index": 3,
+      "name": "bert.encoder.layer.0.attention.self.query",
+      "graph_node_name": "bert_encoder_layer_0_attention_self_query",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.3333941102027893,
+      "weight_max": 0.3670424520969391,
+      "weight_mean": -0.00031058519380167127,
+      "weight_std": 0.07517395168542862,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -5.5837860107421875,
+      "activation_max": 5.769998550415039,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 2.384185791015625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L3#bert.encoder.layer.0.attention.self.query"
+    },
+    {
+      "layer_index": 4,
+      "name": "bert.encoder.layer.0.attention.self.key",
+      "graph_node_name": "bert_encoder_layer_0_attention_self_key",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.3580194115638733,
+      "weight_max": 0.3169213533401489,
+      "weight_mean": 0.0003288397565484047,
+      "weight_std": 0.07382212579250336,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -5.668583393096924,
+      "activation_max": 5.3483991622924805,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L4#bert.encoder.layer.0.attention.self.key"
+    },
+    {
+      "layer_index": 5,
+      "name": "bert.encoder.layer.0.attention.self.value",
+      "graph_node_name": "bert_encoder_layer_0_attention_self_value",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.4994737505912781,
+      "weight_max": 0.524848997592926,
+      "weight_mean": 7.176463259384036e-05,
+      "weight_std": 0.10076019912958145,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -8.750044822692871,
+      "activation_max": 9.100244522094727,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 9.5367431640625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L5#bert.encoder.layer.0.attention.self.value"
+    },
+    {
+      "layer_index": 6,
+      "name": "bert.encoder.layer.0.attention.output.dense",
+      "graph_node_name": "bert_encoder_layer_0_attention_output_dense",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.6288442015647888,
+      "weight_max": 0.4930584728717804,
+      "weight_mean": 7.876254676375538e-05,
+      "weight_std": 0.10281331092119217,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -8.950201034545898,
+      "activation_max": 9.505659103393555,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 1.9073486328125e-06,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L6#bert.encoder.layer.0.attention.output.dense"
+    },
+    {
+      "layer_index": 7,
+      "name": "bert.encoder.layer.0.intermediate.dense",
+      "graph_node_name": "bert_encoder_layer_0_intermediate_dense",
+      "weight_shape": [
+        512,
+        128
+      ],
+      "weight_min": -0.6077804565429688,
+      "weight_max": 0.622075080871582,
+      "weight_mean": -0.001676358631812036,
+      "weight_std": 0.07553910464048386,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        512
+      ],
+      "activation_min": -14.585249900817871,
+      "activation_max": 13.3469877243042,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 2.384185791015625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L7#bert.encoder.layer.0.intermediate.dense"
+    },
+    {
+      "layer_index": 8,
+      "name": "bert.encoder.layer.0.output.dense",
+      "graph_node_name": "bert_encoder_layer_0_output_dense",
+      "weight_shape": [
+        128,
+        512
+      ],
+      "weight_min": -1.4520817995071411,
+      "weight_max": 1.086883306503296,
+      "weight_mean": -0.0002998526906594634,
+      "weight_std": 0.06226060166954994,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 1.52587890625e-05,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -22.470439910888672,
+      "activation_max": 8.778178215026855,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 1.1920928955078125e-06,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L8#bert.encoder.layer.0.output.dense"
+    },
+    {
+      "layer_index": 9,
+      "name": "bert.encoder.layer.1.attention.self.query",
+      "graph_node_name": "bert_encoder_layer_1_attention_self_query",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.47887635231018066,
+      "weight_max": 0.3639148473739624,
+      "weight_mean": -0.00032515000202693045,
+      "weight_std": 0.10035993158817291,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -7.103265762329102,
+      "activation_max": 7.247729778289795,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 9.5367431640625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L9#bert.encoder.layer.1.attention.self.query"
+    },
+    {
+      "layer_index": 10,
+      "name": "bert.encoder.layer.1.attention.self.key",
+      "graph_node_name": "bert_encoder_layer_1_attention_self_key",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.31455186009407043,
+      "weight_max": 0.30918794870376587,
+      "weight_mean": 0.0001261182187590748,
+      "weight_std": 0.07264041900634766,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -6.383677959442139,
+      "activation_max": 5.764143466949463,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 7.152557373046875e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L10#bert.encoder.layer.1.attention.self.key"
+    },
+    {
+      "layer_index": 11,
+      "name": "bert.encoder.layer.1.attention.self.value",
+      "graph_node_name": "bert_encoder_layer_1_attention_self_value",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.3967311978340149,
+      "weight_max": 0.4044102728366852,
+      "weight_mean": 9.46884392760694e-05,
+      "weight_std": 0.09836328774690628,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -6.800621032714844,
+      "activation_max": 6.902810096740723,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 4.76837158203125e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L11#bert.encoder.layer.1.attention.self.value"
+    },
+    {
+      "layer_index": 12,
+      "name": "bert.encoder.layer.1.attention.output.dense",
+      "graph_node_name": "bert_encoder_layer_1_attention_output_dense",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.957184910774231,
+      "weight_max": 1.1614151000976562,
+      "weight_mean": -8.33206286188215e-06,
+      "weight_std": 0.14560912549495697,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 6.103515625e-05,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -12.09937572479248,
+      "activation_max": 13.428850173950195,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 7.152557373046875e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L12#bert.encoder.layer.1.attention.output.dense"
+    },
+    {
+      "layer_index": 13,
+      "name": "bert.encoder.layer.1.intermediate.dense",
+      "graph_node_name": "bert_encoder_layer_1_intermediate_dense",
+      "weight_shape": [
+        512,
+        128
+      ],
+      "weight_min": -0.537263810634613,
+      "weight_max": 0.9211552143096924,
+      "weight_mean": -0.0015622095670551062,
+      "weight_std": 0.08147282898426056,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 1.52587890625e-05,
+      "activation_shape": [
+        32,
+        128,
+        512
+      ],
+      "activation_min": -12.782312393188477,
+      "activation_max": 7.0633463859558105,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 6.556510925292969e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L13#bert.encoder.layer.1.intermediate.dense"
+    },
+    {
+      "layer_index": 14,
+      "name": "bert.encoder.layer.1.output.dense",
+      "graph_node_name": "bert_encoder_layer_1_output_dense",
+      "weight_shape": [
+        128,
+        512
+      ],
+      "weight_min": -0.6272756457328796,
+      "weight_max": 0.5529745817184448,
+      "weight_mean": -0.000209937832551077,
+      "weight_std": 0.09192000329494476,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 1.52587890625e-05,
+      "activation_shape": [
+        32,
+        128,
+        128
+      ],
+      "activation_min": -6.1511125564575195,
+      "activation_max": 6.41269063949585,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 1.9073486328125e-06,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L14#bert.encoder.layer.1.output.dense"
+    },
+    {
+      "layer_index": 15,
+      "name": "bert.pooler.dense",
+      "graph_node_name": "bert_pooler_dense",
+      "weight_shape": [
+        128,
+        128
+      ],
+      "weight_min": -0.7301856875419617,
+      "weight_max": 0.7342725992202759,
+      "weight_mean": 0.00014535372611135244,
+      "weight_std": 0.08582647889852524,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 6.103515625e-05,
+      "activation_shape": [
+        32,
+        128
+      ],
+      "activation_min": -21.18984603881836,
+      "activation_max": 19.748783111572266,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L15#bert.pooler.dense"
+    },
+    {
+      "layer_index": 16,
+      "name": "classifier",
+      "graph_node_name": "classifier",
+      "weight_shape": [
+        2,
+        128
+      ],
+      "weight_min": -0.08671897649765015,
+      "weight_max": 0.07854441553354263,
+      "weight_mean": -0.0002182736643590033,
+      "weight_std": 0.03255338966846466,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        32,
+        2
+      ],
+      "activation_min": -3.1528799533843994,
+      "activation_max": 3.2678966522216797,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "BERT-tiny",
+      "layer_id": "BERT-tiny#L16#classifier"
+    }
+  ],
+  "schema_note": "per_layer_profile. activation_min/max/shape/sparsity null when calibration_batches=0. activation_sparsity_near_zero uses activation_near_zero_thr from run.",
+  "activation_near_zero_threshold": 1e-06
+}
