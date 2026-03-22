@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 
+
 module matrix_top_wrapper #(
     parameter DATA_W     = 8,
     parameter ACC_W      = 32,
@@ -67,6 +68,16 @@ module matrix_top_wrapper #(
 
     output wire        dma_busy
 );
+
+`ifndef SYNTHESIS
+    initial begin
+`ifdef USE_NOPP_TILED
+        $display("[%0t] [MATRIX_MODE] NOPP (matrix_tiled_nopp)", $time);
+`else
+        $display("[%0t] [MATRIX_MODE] PP (matrix_tiled)", $time);
+`endif
+    end
+`endif
 
     // ============================================================
     // 1. Register Definitions (CPU-visible config)
@@ -163,6 +174,7 @@ module matrix_top_wrapper #(
     // ============================================================
     // 3. matrix_tiled instance
     // ============================================================
+`ifdef USE_NOPP_TILED
     wire        sys_mem_valid;
     wire [31:0] sys_mem_addr;
     wire [31:0] sys_mem_wdata;
@@ -170,8 +182,24 @@ module matrix_top_wrapper #(
 
     wire        sys_mem_ready;
     wire [31:0] sys_mem_rdata;
+`else
+    wire        rd_mem_valid;
+    wire [31:0] rd_mem_addr;
+    wire        rd_mem_ready;
+    wire [31:0] rd_mem_rdata;
 
+    wire        wr_mem_valid;
+    wire [31:0] wr_mem_addr;
+    wire [31:0] wr_mem_wdata;
+    wire [3:0]  wr_mem_wstrb;
+    wire        wr_mem_ready;
+`endif
+
+`ifdef USE_NOPP_TILED
+    matrix_tiled_nopp #(
+`else
     matrix_tiled #(
+`endif
         .DATA_W     (DATA_W),
         .ACC_W      (ACC_W),
         .MAX_M      (MAX_M),
@@ -193,14 +221,24 @@ module matrix_top_wrapper #(
         .base_addr_A(reg_addr_a),
         .base_addr_B(reg_addr_b),
         .base_addr_C(reg_addr_c),
-
+`ifdef USE_NOPP_TILED
         .mem_valid  (sys_mem_valid),
         .mem_ready  (sys_mem_ready),
         .mem_addr   (sys_mem_addr),
         .mem_wdata  (sys_mem_wdata),
         .mem_wstrb  (sys_mem_wstrb),
         .mem_rdata  (sys_mem_rdata),
-
+`else
+        .rd_mem_valid(rd_mem_valid),
+        .rd_mem_ready(rd_mem_ready),
+        .rd_mem_addr (rd_mem_addr),
+        .rd_mem_rdata(rd_mem_rdata),
+        .wr_mem_valid(wr_mem_valid),
+        .wr_mem_ready(wr_mem_ready),
+        .wr_mem_addr (wr_mem_addr),
+        .wr_mem_wdata(wr_mem_wdata),
+        .wr_mem_wstrb(wr_mem_wstrb),
+`endif
         .busy       (sys_busy),
         .done       (sys_done)
     );
@@ -208,6 +246,7 @@ module matrix_top_wrapper #(
     // ============================================================
     // 4. Bridge: simple mem -> AXI4 master
     // ============================================================
+`ifdef USE_NOPP_TILED
     matrix_axi_master_bridge #(
         .AXI_ADDR_WIDTH (32),
         .AXI_DATA_WIDTH (32),
@@ -264,6 +303,69 @@ module matrix_top_wrapper #(
 
         .busy         (dma_busy)
     );
+`else
+    matrix_axi_master_bridge_split #(
+        .AXI_ADDR_WIDTH (32),
+        .AXI_DATA_WIDTH (32),
+        .AXI_ID_WIDTH   (1)
+    ) u_axi_bridge (
+        .clk          (clk),
+        .resetn       (resetn),
+
+        .rd_valid     (rd_mem_valid),
+        .rd_ready     (rd_mem_ready),
+        .rd_addr      (rd_mem_addr),
+        .rd_rdata     (rd_mem_rdata),
+
+        .wr_valid     (wr_mem_valid),
+        .wr_ready     (wr_mem_ready),
+        .wr_addr      (wr_mem_addr),
+        .wr_wdata     (wr_mem_wdata),
+        .wr_wstrb     (wr_mem_wstrb),
+
+        .m_axi_awid   (m_axi_awid),
+        .m_axi_awaddr (m_axi_awaddr),
+        .m_axi_awlen  (m_axi_awlen),
+        .m_axi_awsize (m_axi_awsize),
+        .m_axi_awburst(m_axi_awburst),
+        .m_axi_awlock (m_axi_awlock),
+        .m_axi_awcache(m_axi_awcache),
+        .m_axi_awprot (m_axi_awprot),
+        .m_axi_awvalid(m_axi_awvalid),
+        .m_axi_awready(m_axi_awready),
+
+        .m_axi_wdata  (m_axi_wdata),
+        .m_axi_wstrb  (m_axi_wstrb),
+        .m_axi_wlast  (m_axi_wlast),
+        .m_axi_wvalid (m_axi_wvalid),
+        .m_axi_wready (m_axi_wready),
+
+        .m_axi_bid    (m_axi_bid),
+        .m_axi_bresp  (m_axi_bresp),
+        .m_axi_bvalid (m_axi_bvalid),
+        .m_axi_bready (m_axi_bready),
+
+        .m_axi_arid   (m_axi_arid),
+        .m_axi_araddr (m_axi_araddr),
+        .m_axi_arlen  (m_axi_arlen),
+        .m_axi_arsize (m_axi_arsize),
+        .m_axi_arburst(m_axi_arburst),
+        .m_axi_arlock (m_axi_arlock),
+        .m_axi_arcache(m_axi_arcache),
+        .m_axi_arprot (m_axi_arprot),
+        .m_axi_arvalid(m_axi_arvalid),
+        .m_axi_arready(m_axi_arready),
+
+        .m_axi_rid    (m_axi_rid),
+        .m_axi_rdata  (m_axi_rdata),
+        .m_axi_rresp  (m_axi_rresp),
+        .m_axi_rlast  (m_axi_rlast),
+        .m_axi_rvalid (m_axi_rvalid),
+        .m_axi_rready (m_axi_rready),
+
+        .busy         (dma_busy)
+    );
+`endif
 
 
 

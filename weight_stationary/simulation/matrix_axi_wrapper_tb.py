@@ -374,6 +374,52 @@ async def run_one_case(
     )
 
 
+async def run_ws_traffic_check(dut, mem, *, tile_m=8, tile_n=8, case):
+    await reset_dut(dut)
+    mem.clear_stats()
+    await run_one_case(dut, mem, **case)
+
+    m_tiles = (case["M"] + tile_m - 1) // tile_m if case["M"] > 0 else 0
+    n_tiles = (case["N"] + tile_n - 1) // tile_n if case["N"] > 0 else 0
+
+    b_words_total = case["K"] * packed_words_per_row(case["N"])
+    a_words_total = case["M"] * packed_words_per_row(case["K"])
+    c_words_total = case["M"] * case["N"]
+
+    actual_b_reads = mem.count_reads(case["baseB_word"], b_words_total)
+    actual_a_reads = mem.count_reads(case["baseA_word"], a_words_total)
+    actual_c_reads = mem.count_reads(case["baseC_word"], c_words_total)
+    actual_c_writes = mem.count_writes(case["baseC_word"], c_words_total)
+
+    expected_b_reads_ws = b_words_total
+    expected_b_reads_naive = max(1, m_tiles) * b_words_total
+    expected_a_reads_ws = n_tiles * a_words_total
+
+    if actual_b_reads != expected_b_reads_ws:
+        raise AssertionError(
+            f"{case['case_name']}: expected {expected_b_reads_ws} B reads, got {actual_b_reads}"
+        )
+    if actual_a_reads != expected_a_reads_ws:
+        raise AssertionError(
+            f"{case['case_name']}: expected {expected_a_reads_ws} A reads, got {actual_a_reads}"
+        )
+    if actual_c_reads != 0:
+        raise AssertionError(
+            f"{case['case_name']}: expected 0 C reads, got {actual_c_reads}"
+        )
+    if actual_c_writes != c_words_total:
+        raise AssertionError(
+            f"{case['case_name']}: expected {c_words_total} C writes, got {actual_c_writes}"
+        )
+
+    dut._log.info(
+        "PASS WS DDR reuse check: "
+        f"case={case['case_name']} "
+        f"B reads={actual_b_reads} vs naive_no_reuse={expected_b_reads_naive}, "
+        f"A reads={actual_a_reads}, C reads={actual_c_reads}, C writes={actual_c_writes}"
+    )
+
+
 @cocotb.test()
 async def test_matrix_top_wrapper_axi(dut):
     random.seed(2026)
@@ -410,54 +456,46 @@ async def test_matrix_top_wrapper_axi(dut):
     for case in repeat_cases:
         await run_one_case(dut, mem, **case)
 
-    # WS-specific traffic check: when K and N fit in one tile, B should be loaded once
-    # and then reused across all M tiles.
-    await reset_dut(dut)
-    mem.clear_stats()
-    reuse_case = dict(
-        case_name="ws_b_reuse_single_kn_tile",
-        M=32,
-        K=8,
-        N=8,
-        data_mode="random",
-        baseA_word=5000,
-        baseB_word=7000,
-        baseC_word=9000,
-        wait_prob=0.0,
-        max_wait=1,
-    )
-    await run_one_case(dut, mem, **reuse_case)
+    ws_reuse_cases = [
+        dict(
+            case_name="ws_b_reuse_single_kn_tile",
+            M=32,
+            K=8,
+            N=8,
+            data_mode="random",
+            baseA_word=5000,
+            baseB_word=7000,
+            baseC_word=9000,
+            wait_prob=0.0,
+            max_wait=1,
+        ),
+        dict(
+            case_name="ws_b_reuse_multi_k_tile",
+            M=16,
+            K=16,
+            N=8,
+            data_mode="random",
+            baseA_word=11000,
+            baseB_word=13000,
+            baseC_word=15000,
+            wait_prob=0.0,
+            max_wait=1,
+        ),
+        dict(
+            case_name="ws_b_reuse_multi_n_tile",
+            M=16,
+            K=8,
+            N=16,
+            data_mode="random",
+            baseA_word=17000,
+            baseB_word=19000,
+            baseC_word=21000,
+            wait_prob=0.0,
+            max_wait=1,
+        ),
+    ]
 
-    b_words_total = reuse_case["K"] * packed_words_per_row(reuse_case["N"])
-    a_words_total = reuse_case["M"] * packed_words_per_row(reuse_case["K"])
-    c_words_total = reuse_case["M"] * reuse_case["N"]
-    m_tile_count = (reuse_case["M"] + 7) // 8
-
-    actual_b_reads = mem.count_reads(reuse_case["baseB_word"], b_words_total)
-    actual_a_reads = mem.count_reads(reuse_case["baseA_word"], a_words_total)
-    actual_c_writes = mem.count_writes(reuse_case["baseC_word"], c_words_total)
-
-    expected_b_reads_ws = b_words_total
-    expected_b_reads_naive = m_tile_count * b_words_total
-
-    if actual_b_reads != expected_b_reads_ws:
-        raise AssertionError(
-            f"WS B reuse check failed: expected {expected_b_reads_ws} B reads, got {actual_b_reads}"
-        )
-    if actual_a_reads != a_words_total:
-        raise AssertionError(
-            f"WS B reuse check failed: expected {a_words_total} A reads, got {actual_a_reads}"
-        )
-    if actual_c_writes != c_words_total:
-        raise AssertionError(
-            f"WS B reuse check failed: expected {c_words_total} C writes, got {actual_c_writes}"
-        )
-
-    dut._log.info(
-        "PASS WS DDR reuse check: "
-        f"B reads={actual_b_reads} vs naive_no_reuse={expected_b_reads_naive}, "
-        f"A reads={actual_a_reads}, C writes={actual_c_writes}"
-    )
+    for case in ws_reuse_cases:
+        await run_ws_traffic_check(dut, mem, case=case)
 
     dut._log.info("ALL AXI WRAPPER TEST CASES PASSED")
-

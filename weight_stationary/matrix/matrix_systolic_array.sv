@@ -76,25 +76,22 @@ module matrix_systolic_array #(
             k_idx <= k_idx_n;
     end
 
-    integer ii;
-    integer jj;
-    integer idx;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (ii = 0; ii < MAX_M*MAX_N; ii++) begin
+            for (int ii = 0; ii < MAX_M*MAX_N; ii++) begin
                 partial_sum[ii] <= '0;
             end
         end else begin
             if (state == S_IDLE && start) begin
-                for (ii = 0; ii < MAX_M*MAX_N; ii++) begin
+                for (int ii = 0; ii < MAX_M*MAX_N; ii++) begin
                     partial_sum[ii] <= '0;
                 end
             end else if (state == S_COMPUTE) begin
-                for (ii = 0; ii < MAX_M; ii++) begin
-                    for (jj = 0; jj < MAX_N; jj++) begin
-                        idx = ii * MAX_N + jj;
+                for (int ii = 0; ii < MAX_M; ii++) begin
+                    for (int jj = 0; jj < MAX_N; jj++) begin
                         if ((ii < mat_m_num) && (jj < mat_n_num) && (k_idx < mat_k_num))
-                            partial_sum[idx] <= partial_sum[idx] + pe_product[idx];
+                            partial_sum[ii*MAX_N + jj] <=
+                                partial_sum[ii*MAX_N + jj] + pe_product[ii*MAX_N + jj];
                     end
                 end
             end
@@ -166,11 +163,10 @@ module matrix_systolic_array #(
 
     always_comb begin
         partial_sum_flat = '0;
-        for (ii = 0; ii < MAX_M; ii++) begin
-            for (jj = 0; jj < MAX_N; jj++) begin
-                idx = ii * MAX_N + jj;
+        for (int ii = 0; ii < MAX_M; ii++) begin
+            for (int jj = 0; jj < MAX_N; jj++) begin
                 if ((ii < mat_m_num) && (jj < mat_n_num))
-                    partial_sum_flat[idx*ACC_W +: ACC_W] = partial_sum[idx];
+                    partial_sum_flat[(ii*MAX_N + jj)*ACC_W +: ACC_W] = partial_sum[ii*MAX_N + jj];
             end
         end
     end
