@@ -331,6 +331,47 @@ async def check_status_idle(dut):
         raise AssertionError(f"done_latched should be 1 after completion, got status=0x{status:08x}")
 
 
+async def program_optional_array_config(dut, case):
+    if "auto_config_en" in case:
+        await bus_write(dut, 0x24, 0x1 if bool(case.get("auto_config_en")) else 0x0)
+    if "manual_row_mask" in case:
+        await bus_write(dut, 0x28, int(case.get("manual_row_mask", 0)) & 0xFFFFFFFF)
+    if "manual_col_mask" in case:
+        await bus_write(dut, 0x2C, int(case.get("manual_col_mask", 0)) & 0xFFFFFFFF)
+
+
+async def read_optional_array_config(dut, *, default_rows=8, default_cols=8):
+    cfg_status = await bus_read(dut, 0x30)
+    cfg_masks = await bus_read(dut, 0x34)
+
+    selected_cfg_id = (cfg_status >> 24) & 0xFF
+    selected_active_cols = (cfg_status >> 16) & 0xFF
+    selected_active_rows = (cfg_status >> 8) & 0xFF
+
+    if selected_active_rows == 0:
+        selected_active_rows = int(default_rows)
+    if selected_active_cols == 0:
+        selected_active_cols = int(default_cols)
+
+    row_mask_width = int(default_rows)
+    col_mask_width = int(default_cols)
+    row_mask = cfg_masks & ((1 << row_mask_width) - 1)
+    col_mask = (cfg_masks >> row_mask_width) & ((1 << col_mask_width) - 1)
+
+    if row_mask == 0:
+        row_mask = (1 << row_mask_width) - 1
+    if col_mask == 0:
+        col_mask = (1 << col_mask_width) - 1
+
+    return {
+        "selected_cfg_id": selected_cfg_id,
+        "selected_active_rows": selected_active_rows,
+        "selected_active_cols": selected_active_cols,
+        "selected_row_mask": row_mask,
+        "selected_col_mask": col_mask,
+    }
+
+
 async def measure_until_event(dut, done_event, timeout_cycles=1000000):
     sampled_cycles = 0
     dma_busy_cycles = 0
@@ -432,6 +473,7 @@ async def run_benchmark_case(dut, mem, case, *, tile_m=8, tile_n=8):
     await bus_write(dut, 0x0C, M)
     await bus_write(dut, 0x10, K)
     await bus_write(dut, 0x14, N)
+    await program_optional_array_config(dut, case)
 
     done_event = Event()
     monitor = cocotb.start_soon(measure_until_event(dut, done_event))
@@ -442,6 +484,7 @@ async def run_benchmark_case(dut, mem, case, *, tile_m=8, tile_n=8):
     done_event.set()
     busy_window = await monitor
     await check_status_idle(dut)
+    cfg_info = await read_optional_array_config(dut, default_rows=tile_m, default_cols=tile_n)
 
     if M > 0 and K > 0 and N > 0:
         for i in range(M):
@@ -473,25 +516,46 @@ async def run_benchmark_case(dut, mem, case, *, tile_m=8, tile_n=8):
     c_reads = mem.count_reads(baseC_word, c_words_total)
     c_writes = mem.count_writes(baseC_word, c_words_total)
 
-    pe_count = tile_m * tile_n
+    physical_pe_count = tile_m * tile_n
+    configured_pe_count = cfg_info["selected_active_rows"] * cfg_info["selected_active_cols"]
     useful_macs = M * K * N
     latency_cycles = int(round((end_ns - start_ns) / CLOCK_PERIOD_NS))
     busy_cycles = latency_cycles
     throughput_mac_per_cycle = (useful_macs / latency_cycles) if latency_cycles else 0.0
-    utilization = (useful_macs / (pe_count * busy_cycles)) if busy_cycles else 0.0
+    utilization = (useful_macs / (physical_pe_count * busy_cycles)) if busy_cycles else 0.0
+    mapping_efficiency = (useful_macs / (configured_pe_count * busy_cycles)) if (busy_cycles and configured_pe_count) else 0.0
     memory_stall_ratio = (
         busy_window["memory_stall_cycles"] / latency_cycles if latency_cycles else 0.0
     )
     dma_busy_ratio = (busy_window["dma_busy_cycles"] / latency_cycles) if latency_cycles else 0.0
 
-    m_tiles = (M + tile_m - 1) // tile_m if M > 0 else 0
+    eff_tile_m = cfg_info["selected_active_rows"]
+    eff_tile_n = cfg_info["selected_active_cols"]
+    m_tiles = (M + eff_tile_m - 1) // eff_tile_m if M > 0 else 0
+    n_tiles = (N + eff_tile_n - 1) // eff_tile_n if N > 0 else 0
+    k_tiles = (K + tile_m - 1) // tile_m if K > 0 else 0
     unique_a_words = max(1, a_words_total) if a_words_total > 0 else 0
     unique_b_words = max(1, b_words_total) if b_words_total > 0 else 0
+    read_bytes = mem.read_beats * 4
+    write_bytes = mem.write_beats * 4
+    bytes_per_mac = ((read_bytes + write_bytes) / useful_macs) if useful_macs else 0.0
+    read_bytes_per_mac = (read_bytes / useful_macs) if useful_macs else 0.0
+    write_bytes_per_mac = (write_bytes / useful_macs) if useful_macs else 0.0
+    cycles_per_mac = (latency_cycles / useful_macs) if useful_macs else 0.0
+    output_slot_utilization = (
+        (M * N) / (m_tiles * eff_tile_m * n_tiles * eff_tile_n)
+        if (m_tiles and n_tiles and eff_tile_m and eff_tile_n)
+        else 0.0
+    )
 
     result = {
         "case_name": case_name,
         "workload": case.get("workload", case_name),
         "profile": case.get("profile", "custom"),
+        "suite": case.get("suite", "default"),
+        "case_group": case.get("case_group", case.get("workload", case_name)),
+        "shape_tag": case.get("shape_tag"),
+        "config_mode": case.get("config_mode", "default"),
         "M": M,
         "K": K,
         "N": N,
@@ -500,11 +564,24 @@ async def run_benchmark_case(dut, mem, case, *, tile_m=8, tile_n=8):
             "wait_prob": float(mem_cfg.get("wait_prob", 0.0)),
             "max_wait": int(mem_cfg.get("max_wait", 1)),
         },
+        "auto_config_en": case.get("auto_config_en"),
+        "manual_row_mask": case.get("manual_row_mask"),
+        "manual_col_mask": case.get("manual_col_mask"),
+        "selected_cfg_id": cfg_info["selected_cfg_id"],
+        "selected_active_rows": cfg_info["selected_active_rows"],
+        "selected_active_cols": cfg_info["selected_active_cols"],
+        "selected_row_mask": cfg_info["selected_row_mask"],
+        "selected_col_mask": cfg_info["selected_col_mask"],
+        "physical_pe_count": physical_pe_count,
+        "configured_pe_count": configured_pe_count,
         "useful_macs": useful_macs,
         "latency_cycles": latency_cycles,
+        "cycles_per_mac": cycles_per_mac,
         "sys_busy_cycles": busy_cycles,
         "throughput_mac_per_cycle": throughput_mac_per_cycle,
         "array_utilization": utilization,
+        "mapping_efficiency": mapping_efficiency,
+        "output_slot_utilization": output_slot_utilization,
         "dma_busy_cycles": busy_window["dma_busy_cycles"],
         "dma_busy_ratio": dma_busy_ratio,
         "memory_stall_cycles": busy_window["memory_stall_cycles"],
@@ -520,10 +597,17 @@ async def run_benchmark_case(dut, mem, case, *, tile_m=8, tile_n=8):
         "c_writes": c_writes,
         "read_beats": mem.read_beats,
         "write_beats": mem.write_beats,
-        "read_bytes": mem.read_beats * 4,
-        "write_bytes": mem.write_beats * 4,
+        "read_bytes": read_bytes,
+        "write_bytes": write_bytes,
+        "bytes_per_mac": bytes_per_mac,
+        "read_bytes_per_mac": read_bytes_per_mac,
+        "write_bytes_per_mac": write_bytes_per_mac,
         "a_read_amplification": (a_reads / unique_a_words) if unique_a_words else 0.0,
         "b_read_amplification": (b_reads / unique_b_words) if unique_b_words else 0.0,
+        "b_reuse_factor": ((m_tiles * b_words_total) / b_reads) if b_reads else 0.0,
+        "m_tiles": m_tiles,
+        "n_tiles": n_tiles,
+        "k_tiles": k_tiles,
         "naive_b_reads_no_reuse": (m_tiles * b_words_total) if b_words_total else 0,
     }
 
