@@ -18,3 +18,7 @@ benchmark/sim_build_os
 benchmark_in_vivado/benchmark_results.csv
 benchmark_in_vivado/benchmark_results.json
 benchmark_in_vivado/benchmark_results_from_log.csv
+
+*.vvp
+
+
