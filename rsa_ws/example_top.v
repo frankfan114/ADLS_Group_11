@@ -769,7 +769,6 @@ module example_top #
    output                                       init_calib_complete,
 
 
-   input  [11:0]                                device_temp_i,
 
 
                       // The 12 MSB bits of the temperature sensor transfer
@@ -1135,9 +1134,8 @@ function integer clogb2 (input integer size);
   wire [DBG_RD_STS_WIDTH-1:0]       dbg_rd_sts;
 
 
-  wire [11:0]                           device_temp;
-  wire [31:0]                       s_axi_awaddr_ext;
-  wire [31:0]                       s_axi_araddr_ext;
+  wire [31:0]                       matrix_axi_awaddr_full;
+  wire [31:0]                       matrix_axi_araddr_full;
 
 
   
@@ -1184,8 +1182,8 @@ function integer clogb2 (input integer size);
 
   reg [3:0] matrix_cfg_state;
 
-  assign s_axi_awaddr_ext = {{(32-C_S_AXI_ADDR_WIDTH){1'b0}}, s_axi_awaddr};
-  assign s_axi_araddr_ext = {{(32-C_S_AXI_ADDR_WIDTH){1'b0}}, s_axi_araddr};
+  assign s_axi_awaddr = matrix_axi_awaddr_full[C_S_AXI_ADDR_WIDTH-1:0];
+  assign s_axi_araddr = matrix_axi_araddr_full[C_S_AXI_ADDR_WIDTH-1:0];
 `ifdef SKIP_CALIB
 
 
@@ -1273,7 +1271,7 @@ function integer clogb2 (input integer size);
 
 
 
-  mig_7series_1 u_mig_7series_1
+  mig_7series_0 u_mig_7series_0
 
 
       (
@@ -1531,11 +1529,6 @@ function integer clogb2 (input integer size);
        .clk_ref_n                      (clk_ref_n),
 
 
-       .device_temp_i                  (device_temp_i),
-
-
-       .device_temp            (device_temp),
-
 
        `ifdef SKIP_CALIB
 
@@ -1730,7 +1723,7 @@ function integer clogb2 (input integer size);
      .bus_rdata    (matrix_bus_rdata),
 
      .m_axi_awid   (s_axi_awid),
-     .m_axi_awaddr (s_axi_awaddr_ext),
+     .m_axi_awaddr (matrix_axi_awaddr_full),
      .m_axi_awlen  (s_axi_awlen),
      .m_axi_awsize (s_axi_awsize),
      .m_axi_awburst(s_axi_awburst),
@@ -1752,7 +1745,7 @@ function integer clogb2 (input integer size);
      .m_axi_bready (s_axi_bready),
 
      .m_axi_arid   (s_axi_arid),
-     .m_axi_araddr (s_axi_araddr_ext),
+     .m_axi_araddr (matrix_axi_araddr_full),
      .m_axi_arlen  (s_axi_arlen),
      .m_axi_arsize (s_axi_arsize),
      .m_axi_arburst(s_axi_arburst),

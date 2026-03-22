@@ -125,12 +125,12 @@ module matrix_systolic_array #(
             k_idx <= k_idx_n;
     end
 
-    integer ii;
-    integer jj;
-    integer idx;
-    integer logical_row_idx;
-    integer logical_col_idx;
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin : PARTIAL_SUM_ACCUM
+        integer ii;
+        integer jj;
+        integer idx;
+        integer logical_row_idx;
+        integer logical_col_idx;
         if (!rst_n) begin
             for (ii = 0; ii < MAX_M*MAX_N; ii++) begin
                 partial_sum[ii] <= '0;
@@ -228,7 +228,12 @@ module matrix_systolic_array #(
         end
     endgenerate
 
-    always_comb begin
+    always_comb begin : PACK_PARTIAL_SUM
+        integer ii;
+        integer jj;
+        integer idx;
+        integer logical_row_idx;
+        integer logical_col_idx;
         partial_sum_flat = '0;
         for (ii = 0; ii < MAX_M; ii++) begin
             for (jj = 0; jj < MAX_N; jj++) begin

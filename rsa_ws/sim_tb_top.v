@@ -1038,11 +1038,7 @@ module sim_tb_top;
 
     
 
-     .device_temp_i        (12'b0),
-
-    
-
-      .init_calib_complete (init_calib_complete),
+     .init_calib_complete (init_calib_complete),
 
       .tg_compare_error    (tg_compare_error),
 
