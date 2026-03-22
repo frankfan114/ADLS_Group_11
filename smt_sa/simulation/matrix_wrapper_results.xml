@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1773954885" />
+    <testcase name="test_matrix_top_wrapper_axi" classname="matrix_axi_wrapper_tb" file="D:\Document\ADL_Group_11\weight_stationary\simulation\matrix_axi_wrapper_tb.py" lineno="423" time="2.068343162536621" sim_time_ns="147190.0" ratio_time="71163.23957552857" />
+  </testsuite>
+</testsuites>
