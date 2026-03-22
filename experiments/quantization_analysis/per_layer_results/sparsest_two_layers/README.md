@@ -1,18 +1,19 @@
-# 最稀疏两层（activation）— 信息与权重
+# Two sparsest layers (by activation) — metadata and weights
 
-- **层名：** `layer4.1.conv3`（ResNet50 bottleneck 第 3 个 1×1 conv）
-- **来源：** 全库 `per_layer_results` 中 `activation_sparsity_zero` 最高的两条记录（w4 QAT 与 w16 QAT）
+- **Layer name:** `layer4.1.conv3` (third 1×1 conv in a ResNet50 bottleneck block).
+- **Source:** The two entries with the highest `activation_sparsity_zero` across `per_layer_results` (w4 QAT and w16 QAT checkpoints).
 
-| 文件 | 说明 |
-|------|------|
-| `sparsest_two_layers_info.json` | 两层完整 profile 字段（来自 `*_conv_per_layer.json`）+ 来源文件名 |
-| `resnet50_w4_layer4_1_conv3_weights.json` | 从 `ResNet50_w4_qat.pt` 导出的权重（int8 + scale） |
-| `resnet50_w16_layer4_1_conv3_weights.json` | 从 `ResNet50_w16_qat.pt` 导出 |
+| File | Description |
+|------|-------------|
+| `sparsest_two_layers_info.json` | Full per-layer profile fields (from `*_conv_per_layer.json`) plus source filenames. |
+| `resnet50_w4_layer4_1_conv3_weights.json` | Weights from `ResNet50_w4_qat.pt` (int8 list + `scale_weight`). |
+| `resnet50_w16_layer4_1_conv3_weights.json` | Weights from `ResNet50_w16_qat.pt` (same format). |
 
-权重 JSON 体积较大（约 1M 参数 × 整型列表）。重新生成：
+Weight JSON files are large (~1M parameters as nested int lists). Regenerate with:
 
 ```bash
+cd experiments/quantization_analysis
 python export_sparsest_two_layers.py
 ```
 
-（在 `quantization_analysis` 目录下，`checkpoints/` 需存在对应 `.pt`。）
+Requires matching `*.pt` files under `checkpoints/`.

@@ -12,7 +12,8 @@ Pure PyTorch: `QuantLinear` / `QuantConv2d`, PTQ/QAT sweep, FC-layer profiling.
 | `quant_layers.py` | Quantized layers + `replace_with_quant` |
 | `run_sweep.py` | Train baseline, PTQ/QAT sweep, save `results/` + `checkpoints/` |
 | `per_layer_profile.py` | Linear + Conv2d profiles (`*_linear_*.json`, `*_conv_*.json` for vision) |
-| `export_five_layers_weights.py` | Export 5 selected layers’ weights to int JSON from QAT checkpoints |
+| `export_five_layers_weights.py` | Export 5 selected FC layers’ weights to int JSON from QAT checkpoints |
+| `export_sparsest_two_layers.py` | Export the two sparsest conv layers (see `per_layer_results/sparsest_two_layers/`) |
 
 ## Quick start
 
