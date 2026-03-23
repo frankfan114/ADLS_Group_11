@@ -8,7 +8,7 @@ module matrix_tiled #(
     parameter int SRAM_W         = 32,
     parameter int ADDR_WIDTH     = 32,
     parameter int PE_PIPE        = 1,
-    parameter int ACC_TILE_SLOTS = 256
+    parameter int ACC_TILE_SLOTS = 32
 )(
     input  logic                    clk,
     input  logic                    rst_n,
@@ -60,6 +60,17 @@ module matrix_tiled #(
         num_tile_n = (glob_n_num == 0) ? 16'd0 : ((glob_n_num + (TILE_N-1)) >> TILE_N_SHIFT);
         num_tile_k = (glob_k_num == 0) ? 16'd0 : ((glob_k_num + (TILE_K-1)) >> TILE_K_SHIFT);
     end
+
+`ifndef SYNTHESIS
+    always @(posedge clk) begin
+        if (rst_n && start && (num_tile_m > ACC_TILE_SLOTS)) begin
+            $fatal(1,
+                   "matrix_tiled ACC_TILE_SLOTS overflow: have %0d slots, need %0d M-tiles",
+                   ACC_TILE_SLOTS,
+                   num_tile_m);
+        end
+    end
+`endif
 
     logic [15:0] tile_m_idx, tile_n_idx, tile_k_idx;
     logic [15:0] tile_m_idx_n, tile_n_idx_n, tile_k_idx_n;
@@ -172,9 +183,14 @@ module matrix_tiled #(
     // In system-level WS mode, one B tile is reused across all M tiles for a fixed (K, N) pair.
     assign core_allow_b_reuse = (tile_m_idx != 16'd0);
 
-    logic [TILE_ACC_BITS-1:0] c_tile_spad [0:ACC_TILE_SLOTS-1];
+    // Store each output element in its own narrow bank instead of building one
+    // very wide memory word per M tile. Vivado can map this pattern, while the
+    // previous ACC_TILE_SLOTS x TILE_ACC_BITS organization could not be
+    // inferred once MAX_M/MAX_N grew to 16x16.
+    (* ram_style = "distributed" *) logic [ACC_W-1:0] c_tile_spad [0:TOTAL_ELEMS_TILE-1][0:ACC_TILE_SLOTS-1];
     logic [TILE_ACC_BITS-1:0] wb_partial_flat;
-    integer ii;
+    integer accum_i;
+    integer wb_i;
 
     wire last_tm = (num_tile_m != 0) && (tile_m_idx == (num_tile_m - 1));
     wire last_tk = (num_tile_k != 0) && (tile_k_idx == (num_tile_k - 1));
@@ -192,23 +208,32 @@ module matrix_tiled #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (ii = 0; ii < ACC_TILE_SLOTS; ii++) begin
-                c_tile_spad[ii] <= '0;
-            end
+            // c_tile_spad is intentionally left un-reset so synthesis can map
+            // it more efficiently. Each live slot is overwritten on first_tk
+            // before it is ever consumed by writeback.
         end else if (t_state == TS_ACCUM) begin
-            if (first_tk) begin
-                c_tile_spad[tile_m_idx] <= core_partial_flat_r;
-            end else begin
-                for (ii = 0; ii < TOTAL_ELEMS_TILE; ii++) begin
-                    c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] <=
-                        c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] + core_partial_flat_r[ii*ACC_W +: ACC_W];
+            for (accum_i = 0; accum_i < TOTAL_ELEMS_TILE; accum_i++) begin
+                if (first_tk) begin
+                    c_tile_spad[accum_i][tile_m_idx] <=
+                        core_partial_flat_r[accum_i*ACC_W +: ACC_W];
+                end else begin
+                    c_tile_spad[accum_i][tile_m_idx] <=
+                        c_tile_spad[accum_i][tile_m_idx] +
+                        core_partial_flat_r[accum_i*ACC_W +: ACC_W];
                 end
             end
         end
     end
 
-    always_comb begin
-        wb_partial_flat = c_tile_spad[wb_tile_m_idx];
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            wb_partial_flat <= '0;
+        end else if (t_state == TS_WB_START) begin
+            // Snapshot the selected tile one cycle before writeback consumes it.
+            for (wb_i = 0; wb_i < TOTAL_ELEMS_TILE; wb_i++) begin
+                wb_partial_flat[wb_i*ACC_W +: ACC_W] <= c_tile_spad[wb_i][wb_tile_m_idx];
+            end
+        end
     end
 
     logic wb_start;
