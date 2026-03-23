@@ -12,15 +12,15 @@
 
 ## Main RTL
 
-- `matrix/matrix_adaptnet_selector.sv`
+- `rtl/matrix_adaptnet_selector.sv`
   ADAPTNET-style configuration selector.
-- `matrix/matrix_systolic_array.sv`
+- `rtl/matrix_systolic_array.sv`
   Row/column bypass-aware PE mapping.
-- `matrix/matrix_fetch.sv`
+- `rtl/matrix_fetch.sv`
   Fetch path with programmable column offset for flexible B-tile alignment.
-- `matrix/matrix_tiled.sv`
+- `rtl/matrix_tiled.sv`
   Runtime-configurable tiler and config latch.
-- `matrix/matrix_top_wrapper.v`
+- `rtl/matrix_top_wrapper.v`
   CPU-visible control/status registers for auto/manual array configuration.
 
 ## Extra Registers
@@ -41,7 +41,7 @@
 Run the cocotb regression for the new design:
 
 ```powershell
-python -c "from pathlib import Path; from cocotb_tools.runner import get_runner; rtl=Path(r'd:\Document\ADL_Group_11\sara_ws\matrix'); sim=Path(r'd:\Document\ADL_Group_11\sara_ws\simulation'); sources=sorted([str(p) for p in rtl.rglob('*.sv')] + [str(p) for p in rtl.rglob('*.v')]); r=get_runner('icarus'); r.build(verilog_sources=sources, hdl_toplevel='matrix_top_wrapper', build_dir=str(sim/'sim_build_matrix_wrapper'), always=True); r.test(hdl_toplevel='matrix_top_wrapper', test_module='matrix_axi_wrapper_tb', test_dir=str(sim), results_xml=str(sim/'matrix_wrapper_results.xml'))"
+python -c "from pathlib import Path; from cocotb_tools.runner import get_runner; rtl=Path(r'd:\Document\ADL_Group_11\rsa_ws\rtl'); sim=Path(r'd:\Document\ADL_Group_11\rsa_ws\simulation'); sources=sorted([str(p) for p in rtl.rglob('*.sv')] + [str(p) for p in rtl.rglob('*.v')]); r=get_runner('icarus'); r.build(verilog_sources=sources, hdl_toplevel='matrix_top_wrapper', build_dir=str(sim/'sim_build_matrix_wrapper'), always=True); r.test(hdl_toplevel='matrix_top_wrapper', test_module='matrix_axi_wrapper_tb', test_dir=str(sim), results_xml=str(sim/'matrix_wrapper_results.xml'))"
 ```
 
 The included regression covers:
