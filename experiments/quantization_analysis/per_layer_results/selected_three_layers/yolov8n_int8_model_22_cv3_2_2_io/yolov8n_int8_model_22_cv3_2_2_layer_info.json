@@ -1,0 +1,51 @@
+{
+  "layer_id": "YOLOv8n-int8#C58#model.22.cv3.2.2",
+  "source_checkpoint": "yolov8n_int8_qat_best.pt",
+  "model_name": "YOLOv8n",
+  "module_name": "model.22.cv3.2.2",
+  "bit_width": 8,
+  "out_name": "yolov8n_int8_model_22_cv3_2_2",
+  "reason": "int8 QAT YOLOv8n classification branch 1x1 conv (P5 head)",
+  "module_type": "QuantConv2d",
+  "in_channels": 80,
+  "out_channels": 80,
+  "kernel_size": [
+    1,
+    1
+  ],
+  "stride": [
+    1,
+    1
+  ],
+  "padding": [
+    0,
+    0
+  ],
+  "groups": 1,
+  "weight_shape": [
+    80,
+    80,
+    1,
+    1
+  ],
+  "bias_shape": [
+    80
+  ],
+  "input_shape": [
+    1,
+    80,
+    20,
+    20
+  ],
+  "output_shape": [
+    1,
+    80,
+    20,
+    20
+  ],
+  "weight_scale": 0.002921998031496063,
+  "bias_scale": 0.0844611220472441,
+  "input_scale": 0.313277627539447,
+  "output_scale": 0.22322855971929595,
+  "note": "int values; to recover float: float_val = int_val * scale_*"
+}
