@@ -194,6 +194,17 @@ module matrix_tiled #(
             wb_cur_m_num = glob_m_num - wb_m_offset;
     end
 
+`ifndef SYNTHESIS
+    always @(posedge clk) begin
+        if (rst_n && start && (num_tile_m > ACC_TILE_SLOTS)) begin
+            $fatal(1,
+                   "rsa_ws matrix_tiled ACC_TILE_SLOTS overflow: have %0d slots, need %0d M-tiles",
+                   ACC_TILE_SLOTS,
+                   num_tile_m);
+        end
+    end
+`endif
+
     logic [ADDR_WIDTH-1:0] base_addr_A_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_B_tile_r;
     logic [COL_OFF_W-1:0]  base_col_offset_A_r;
@@ -271,9 +282,12 @@ module matrix_tiled #(
 
     assign core_allow_b_reuse = (tile_m_idx != 16'd0);
 
-    logic [TILE_ACC_BITS-1:0] c_tile_spad [0:ACC_TILE_SLOTS-1];
+    // Split the tile store into narrow element banks so Vivado can infer
+    // supported memories instead of one ultra-wide RAM per M tile.
+    (* ram_style = "block" *) logic [ACC_W-1:0] c_tile_spad [0:TOTAL_ELEMS_TILE-1][0:ACC_TILE_SLOTS-1];
     logic [TILE_ACC_BITS-1:0] wb_partial_flat;
-    integer ii;
+    integer accum_i;
+    integer wb_i;
 
     wire last_tm = (num_tile_m != 0) && (tile_m_idx == (num_tile_m - 1));
     wire last_tk = (num_tile_k != 0) && (tile_k_idx == (num_tile_k - 1));
@@ -291,25 +305,33 @@ module matrix_tiled #(
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (ii = 0; ii < ACC_TILE_SLOTS; ii++) begin
-                c_tile_spad[ii] <= '0;
-            end
+            // Leave c_tile_spad un-reset so synthesis can keep it as memory.
+            // Each slot is overwritten on first_tk before writeback reads it.
         end else if ((t_state == TS_ACCUM) && (tile_m_idx < ACC_TILE_SLOTS)) begin
-            if (first_tk) begin
-                c_tile_spad[tile_m_idx] <= core_partial_flat_r;
-            end else begin
-                for (ii = 0; ii < TOTAL_ELEMS_TILE; ii++) begin
-                    c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] <=
-                        c_tile_spad[tile_m_idx][ii*ACC_W +: ACC_W] + core_partial_flat_r[ii*ACC_W +: ACC_W];
+            for (accum_i = 0; accum_i < TOTAL_ELEMS_TILE; accum_i++) begin
+                if (first_tk) begin
+                    c_tile_spad[accum_i][tile_m_idx] <=
+                        core_partial_flat_r[accum_i*ACC_W +: ACC_W];
+                end else begin
+                    c_tile_spad[accum_i][tile_m_idx] <=
+                        c_tile_spad[accum_i][tile_m_idx] +
+                        core_partial_flat_r[accum_i*ACC_W +: ACC_W];
                 end
             end
         end
     end
 
-    always_comb begin
-        wb_partial_flat = '0;
-        if (wb_tile_m_idx < ACC_TILE_SLOTS)
-            wb_partial_flat = c_tile_spad[wb_tile_m_idx];
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            wb_partial_flat <= '0;
+        end else if (t_state == TS_WB_START) begin
+            wb_partial_flat <= '0;
+            if (wb_tile_m_idx < ACC_TILE_SLOTS) begin
+                for (wb_i = 0; wb_i < TOTAL_ELEMS_TILE; wb_i++) begin
+                    wb_partial_flat[wb_i*ACC_W +: ACC_W] <= c_tile_spad[wb_i][wb_tile_m_idx];
+                end
+            end
+        end
     end
 
     logic wb_start;
