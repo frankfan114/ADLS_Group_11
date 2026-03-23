@@ -313,7 +313,7 @@ module sim_tb_top;
   localparam integer NUM_CASES = 1;
   localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
-  localparam integer PRINT_CASE_MATRIX_VALUES = 0;
+  localparam integer PRINT_CASE_MATRIX_VALUES = 1;
   localparam integer PRINT_BENCH_RESULT_CSV = 1;
 
   // CASE0 uses baked BERT-tiny RAW JSON data (no bias, no scale):
@@ -2056,23 +2056,6 @@ module sim_tb_top;
         begin : test_timeout
            if (SIM_BYPASS_INIT_CAL == "SIM_INIT_CAL_FULL")
              #30000000000.0;
-           else
-             #10000000000.0;
-
-           if (!init_calib_complete)
-             $display("TEST FAILED: INITIALIZATION DID NOT COMPLETE");
-           else
-             $display("TEST FAILED: VIVADO MATRIX BENCHMARK TIMEOUT");
-
-           if (bench_csv_fd != 0)
-             $fclose(bench_csv_fd);
-
-           disable run_matrix_multicase;
-           $finish;
-        end
-     join
-  end
-endmodule
            else
              #10000000000.0;
 
