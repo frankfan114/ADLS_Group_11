@@ -299,49 +299,99 @@ module sim_tb_top;
   localparam ERR_INSERT = (ECC_TEST == "ON") ? "OFF" : ECC ;
 
   //***************************************************************************//
-  // Matrix Multi-Case Quick Edit Section
-  //   Edit case count / dimensions / A,B data patterns here first.
+  // Output-stationary large-matrix quick-edit section
+  //   Case sizes scale from the compile-time MAX_M / MAX_K / MAX_N hardware
+  //   array dimensions. Runtime row/col mask selection is not part of this TB.
   //***************************************************************************//
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_A = 27'd0;       // byte addr
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_B = 27'd4096;    // byte addr
-  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_C = 27'd8192;    // byte addr
+  localparam [C_S_AXI_ADDR_WIDTH-1:0] AXI_BASE_A_START = 27'd0; // byte addr
+  localparam integer CASE_ADDR_ALIGN_BYTES  = 4096;
+  localparam integer CASE_ADDR_GUARD_BYTES  = 256;
+  localparam integer MIN_CASE_TIMEOUT_CYCLES = 500000;
 
-  localparam [31:0] MATRIX_WORD_BASE_A = 32'd0;
-  localparam [31:0] MATRIX_WORD_BASE_B = 32'd1024;
-  localparam [31:0] MATRIX_WORD_BASE_C = 32'd2048;
-
-  localparam integer NUM_CASES = 8;
-  localparam integer CASE_DONE_TIMEOUT_POLLS = 200000;
+  localparam integer NUM_CASES = 5;
   localparam integer CASE_STATUS_PRINT_EVERY = 20000;
   localparam integer PRINT_CASE_MATRIX_VALUES = 0;
-  localparam integer PRINT_BENCH_RESULT_CSV = 1;
 
   // Case index summary:
-  //   0: 8x8 x 8x8, A=identity,        B=1..64
-  //   1: 8x8 x 8x8, A=all zeros,       B=positive pseudo pattern
-  //   2: 8x8 x 8x8, A/B=signed pattern
-  //   3: 5x3 x 3x7, rectangular case
-  //   4: 1x1 x 1x1, scalar case
-  //   5: 8x1 x 1x8, K=1 edge case
-  //   6: 8x8 x 8x1, N=1 edge case
-  //   7: 3x8 x 8x5, mixed signed case
+  //   0 : 1x hardware tile (sanity)
+  //   1 : M tiled only
+  //   2 : K tiled only
+  //   3 : N tiled only
+  //   4 : M/K/N all tiled
   task get_case_dims;
     input  integer tc_idx;
     output integer m_dim;
     output integer k_dim;
     output integer n_dim;
+    integer hw_m;
+    integer hw_k;
+    integer hw_n;
   begin
+    hw_m = u_ip_top.u_matrix_top_wrapper.MAX_M;
+    hw_k = u_ip_top.u_matrix_top_wrapper.MAX_K;
+    hw_n = u_ip_top.u_matrix_top_wrapper.MAX_N;
+
     case (tc_idx)
-      0: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      1: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      2: begin m_dim = 8; k_dim = 8; n_dim = 8; end
-      3: begin m_dim = 5; k_dim = 3; n_dim = 7; end
-      4: begin m_dim = 1; k_dim = 1; n_dim = 1; end
-      5: begin m_dim = 8; k_dim = 1; n_dim = 8; end
-      6: begin m_dim = 8; k_dim = 8; n_dim = 1; end
-      7: begin m_dim = 3; k_dim = 8; n_dim = 5; end
-      default: begin m_dim = 8; k_dim = 8; n_dim = 8; end
+      0:  begin m_dim = hw_m;         k_dim = hw_k;         n_dim = hw_n;         end
+      1:  begin m_dim = (hw_m * 2)+3; k_dim = hw_k;         n_dim = hw_n;         end
+      2:  begin m_dim = hw_m;         k_dim = (hw_k * 2)+5; n_dim = hw_n;         end
+      3:  begin m_dim = hw_m;         k_dim = hw_k;         n_dim = (hw_n * 2)+7; end
+      4:  begin m_dim = (hw_m * 2)+3; k_dim = (hw_k * 2)+5; n_dim = (hw_n * 2)+7; end
+      default: begin m_dim = hw_m;    k_dim = hw_k;         n_dim = hw_n;         end
     endcase
+  end
+  endtask
+
+  function integer align_up_bytes;
+    input integer value_bytes;
+    input integer align_bytes;
+  begin
+    if (align_bytes <= 0)
+      align_up_bytes = value_bytes;
+    else
+      align_up_bytes = ((value_bytes + align_bytes - 1) / align_bytes) * align_bytes;
+  end
+  endfunction
+
+  task get_case_layout;
+    input  integer m_dim;
+    input  integer k_dim;
+    input  integer n_dim;
+    output [C_S_AXI_ADDR_WIDTH-1:0] axi_base_a;
+    output [C_S_AXI_ADDR_WIDTH-1:0] axi_base_b;
+    output [C_S_AXI_ADDR_WIDTH-1:0] axi_base_c;
+    output [31:0] matrix_word_base_a;
+    output [31:0] matrix_word_base_b;
+    output [31:0] matrix_word_base_c;
+    integer k_words;
+    integer n_words;
+    integer a_bytes;
+    integer b_bytes;
+  begin
+    k_words = (k_dim + 3) / 4;
+    n_words = (n_dim + 3) / 4;
+    a_bytes = m_dim * k_words * 4;
+    b_bytes = k_dim * n_words * 4;
+
+    axi_base_a = AXI_BASE_A_START;
+    axi_base_b = align_up_bytes(a_bytes + CASE_ADDR_GUARD_BYTES, CASE_ADDR_ALIGN_BYTES);
+    axi_base_c = align_up_bytes(axi_base_b + b_bytes + CASE_ADDR_GUARD_BYTES, CASE_ADDR_ALIGN_BYTES);
+
+    matrix_word_base_a = axi_base_a >> 2;
+    matrix_word_base_b = axi_base_b >> 2;
+    matrix_word_base_c = axi_base_c >> 2;
+  end
+  endtask
+
+  task get_case_timeout_cycles;
+    input  integer m_dim;
+    input  integer k_dim;
+    input  integer n_dim;
+    output integer timeout_cycles;
+    integer work_estimate;
+  begin
+    work_estimate  = m_dim * k_dim * n_dim;
+    timeout_cycles = MIN_CASE_TIMEOUT_CYCLES + (work_estimate * 16);
   end
   endtask
 
@@ -352,14 +402,11 @@ module sim_tb_top;
     integer t;
   begin
     case (tc_idx)
-      0: t = (row_idx == k_idx) ? 1 : 0;           // Identity
-      1: t = 0;                                     // All zeros
-      2: t = row_idx - k_idx;                       // Signed pattern
-      3: t = (row_idx * 2) - k_idx - 1;             // Rectangular pattern
-      4: t = 13;                                    // 1x1 scalar
-      5: t = row_idx - 3;                           // K=1 pattern
-      6: t = (row_idx * 2) - k_idx + 1;             // N=1 pattern
-      7: t = ((row_idx * 5) + (k_idx * 3) + 11) % 17 - 8; // Mixed signed
+      0:  t = ((row_idx * 17) + (k_idx * 31)) % 256 - 128;      // 1x tile sanity
+      1:  t = ((row_idx * 19) + (k_idx * 13) + 5) % 256 - 128;  // M tiled
+      2:  t = ((row_idx * 11) + (k_idx * 7) + 3) % 256 - 128;   // K tiled
+      3:  t = ((row_idx * 23) + (k_idx * 9) + 1) % 256 - 128;   // N tiled
+      4:  t = ((row_idx * 5) + (k_idx * 21) + 17) % 256 - 128;  // M/K/N tiled
       default: t = 0;
     endcase
     gen_a_elem = t[7:0];
@@ -373,14 +420,11 @@ module sim_tb_top;
     integer t;
   begin
     case (tc_idx)
-      0: t = k_idx * 8 + col_idx + 1;               // 1..64
-      1: t = (k_idx * 11 + col_idx * 7 + 3) % 101;  // Positive pseudo pattern
-      2: t = k_idx - (2 * col_idx);                 // Signed pattern
-      3: t = (k_idx * 3) + col_idx - 5;             // Rectangular pattern
-      4: t = -7;                                    // 1x1 scalar
-      5: t = col_idx + 1;                           // K=1 pattern
-      6: t = (k_idx % 2) ? -2 : 3;                  // N=1 pattern
-      7: t = ((k_idx * 7) + (col_idx * 2) + 3) % 19 - 9; // Mixed signed
+      0:  t = ((k_idx * 13) + (col_idx * 29)) % 256 - 128;     // 1x tile sanity
+      1:  t = ((k_idx * 7) + (col_idx * 23) + 11) % 256 - 128; // M tiled
+      2:  t = ((k_idx * 5) + (col_idx * 17) + 9) % 256 - 128;  // K tiled
+      3:  t = ((k_idx * 3) + (col_idx * 27) + 15) % 256 - 128; // N tiled
+      4:  t = ((k_idx * 31) + (col_idx * 9) + 13) % 256 - 128; // M/K/N tiled
       default: t = 0;
     endcase
     gen_b_elem = t[7:0];
@@ -965,11 +1009,7 @@ module sim_tb_top;
 
     
 
-     .device_temp_i        (12'b0),
-
-    
-
-      .init_calib_complete (init_calib_complete),
+     .init_calib_complete (init_calib_complete),
 
       .tg_compare_error    (tg_compare_error),
 
@@ -1044,14 +1084,10 @@ module sim_tb_top;
   // Matrix multi-case end-to-end test
   //   flow: preload A/B -> start matrix -> readback C -> compare
   //***************************************************************************
-  localparam integer CASE_DONE_TIMEOUT_CYCLES = 2000000;
-  localparam integer AXI_BYTES_PER_BEAT = C_S_AXI_DATA_WIDTH / 8;
-  localparam integer PHYSICAL_PE_COUNT = 8 * 8;
-
   localparam [2:0] CORE_S_IDLE    = 3'd0;
   localparam [2:0] CORE_S_LOAD_A  = 3'd1;
   localparam [2:0] CORE_S_LOAD_B  = 3'd2;
-  localparam [2:0] CORE_S_CLEAR   = 3'd3;
+  localparam [2:0] CORE_S_START   = 3'd3;
   localparam [2:0] CORE_S_COMPUTE = 3'd4;
 
   localparam [2:0] TILE_TS_IDLE       = 3'd0;
@@ -1065,38 +1101,16 @@ module sim_tb_top;
 
   reg [C_S_AXI_DATA_WIDTH-1:0] axi_test_rdata;
   reg                          axi_test_fail;
-  integer                      bench_csv_fd;
 
   time    case_tb_preload_time   [0:NUM_CASES-1];
   time    case_cfg_time          [0:NUM_CASES-1];
   time    case_core_run_time     [0:NUM_CASES-1];
   time    case_tb_readback_time  [0:NUM_CASES-1];
-  integer case_run_cycles        [0:NUM_CASES-1];
-  integer case_busy_cycles       [0:NUM_CASES-1];
-  integer case_dma_busy_cycles   [0:NUM_CASES-1];
-  integer case_memory_stall_cycles [0:NUM_CASES-1];
-  integer case_aw_wait_cycles    [0:NUM_CASES-1];
-  integer case_w_wait_cycles     [0:NUM_CASES-1];
-  integer case_b_wait_cycles     [0:NUM_CASES-1];
-  integer case_ar_wait_cycles    [0:NUM_CASES-1];
-  integer case_r_wait_cycles     [0:NUM_CASES-1];
-  integer case_axi_active_cycles [0:NUM_CASES-1];
-  integer case_axi_ar_count      [0:NUM_CASES-1];
-  integer case_axi_r_count       [0:NUM_CASES-1];
-  integer case_axi_aw_count      [0:NUM_CASES-1];
-  integer case_axi_w_count       [0:NUM_CASES-1];
-  integer case_axi_b_count       [0:NUM_CASES-1];
-  integer case_axi_a_read_count  [0:NUM_CASES-1];
-  integer case_axi_b_read_count  [0:NUM_CASES-1];
-  integer case_axi_c_read_count  [0:NUM_CASES-1];
-  integer case_axi_c_write_count [0:NUM_CASES-1];
   integer case_core_fetch_cycles [0:NUM_CASES-1];
+  integer case_core_load_b_cycles [0:NUM_CASES-1];
   integer case_core_compute_cycles [0:NUM_CASES-1];
   integer case_core_writeback_cycles [0:NUM_CASES-1];
   integer case_core_move_cycles  [0:NUM_CASES-1];
-  integer case_mismatch_count    [0:NUM_CASES-1];
-  integer case_max_abs_error     [0:NUM_CASES-1];
-  integer case_sum_abs_error     [0:NUM_CASES-1];
 
   function [31:0] calc_expected_elem;
     input integer tc_idx;
@@ -1314,6 +1328,9 @@ module sim_tb_top;
     input integer m_dim;
     input integer k_dim;
     input integer n_dim;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_a;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_b;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_c;
     integer r;
     integer w;
     integer b;
@@ -1338,7 +1355,7 @@ module sim_tb_top;
           else                 elem = 8'd0;
           wr_word = wr_word | ({24'd0, elem} << (8*b));
         end
-        axi_write32(AXI_BASE_A + ((r*k_words + w) << 2), wr_word);
+        axi_write32(axi_base_a + ((r*k_words + w) << 2), wr_word);
       end
     end
 
@@ -1352,14 +1369,14 @@ module sim_tb_top;
           else                 elem = 8'd0;
           wr_word = wr_word | ({24'd0, elem} << (8*b));
         end
-        axi_write32(AXI_BASE_B + ((r*n_words + w) << 2), wr_word);
+        axi_write32(axi_base_b + ((r*n_words + w) << 2), wr_word);
       end
     end
 
     // Clear C region for this case footprint
     for (r = 0; r < m_dim; r = r + 1) begin
       for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
-        axi_write32(AXI_BASE_C + (((r*n_dim + col_idx) << 2)), 32'd0);
+        axi_write32(axi_base_c + (((r*n_dim + col_idx) << 2)), 32'd0);
       end
     end
 
@@ -1372,57 +1389,27 @@ module sim_tb_top;
     input integer m_dim;
     input integer k_dim;
     input integer n_dim;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_a;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_b;
+    input [C_S_AXI_ADDR_WIDTH-1:0] axi_base_c;
+    input [31:0] matrix_word_base_a;
+    input [31:0] matrix_word_base_b;
+    input [31:0] matrix_word_base_c;
+    input integer case_timeout_cycles;
     output time cfg_elapsed;
     output time core_run_elapsed;
     output time readback_elapsed;
-    output integer run_cycles;
-    output integer busy_cycles;
-    output integer dma_busy_cycles;
-    output integer memory_stall_cycles;
-    output integer aw_wait_cycles;
-    output integer w_wait_cycles;
-    output integer b_wait_cycles;
-    output integer ar_wait_cycles;
-    output integer r_wait_cycles;
-    output integer axi_active_cycles;
-    output integer axi_ar_count;
-    output integer axi_r_count;
-    output integer axi_aw_count;
-    output integer axi_w_count;
-    output integer axi_b_count;
-    output integer axi_a_read_count;
-    output integer axi_b_read_count;
-    output integer axi_c_read_count;
-    output integer axi_c_write_count;
     output integer fetch_cycles;
+    output integer load_b_cycles;
     output integer compute_cycles;
     output integer writeback_cycles;
-    output integer mismatch_count;
-    output integer max_abs_error;
-    output integer sum_abs_error;
     integer r;
     integer col_idx;
     integer poll_count;
     integer timeout_cycles;
     integer seen_done_clear;
     integer seen_busy;
-    integer ar_hs;
-    integer r_hs;
-    integer aw_hs;
-    integer w_hs;
-    integer b_hs;
-    integer aw_wait;
-    integer w_wait;
-    integer b_wait;
-    integer ar_wait;
-    integer r_wait;
-    integer total_macs;
-    integer read_bytes;
-    integer write_bytes;
-    integer expected_s;
-    integer got_s;
-    integer diff_abs;
-    integer total_outputs;
+    integer mismatch_count;
     reg [31:0] expected_c;
     reg [31:0] status;
     reg [31:0] status_prev;
@@ -1437,48 +1424,22 @@ module sim_tb_top;
     time cfg_start_time;
     time core_run_start_time;
     time readback_start_time;
-    real dma_busy_ratio;
-    real axi_active_ratio;
-    real throughput_mac_per_cycle;
-    real pe_utilization;
-    real memory_stall_ratio;
-    real mean_abs_error;
   begin
-    $display("CASE%0d start M=%0d K=%0d N=%0d", tc_idx, m_dim, k_dim, n_dim);
+    $display("CASE%0d start M=%0d K=%0d N=%0d baseA=%0h baseB=%0h baseC=%0h timeout=%0d",
+             tc_idx, m_dim, k_dim, n_dim, axi_base_a, axi_base_b, axi_base_c, case_timeout_cycles);
     cfg_elapsed      = 0;
     core_run_elapsed = 0;
     readback_elapsed = 0;
-    run_cycles         = 0;
-    busy_cycles        = 0;
-    dma_busy_cycles    = 0;
-    memory_stall_cycles = 0;
-    aw_wait_cycles     = 0;
-    w_wait_cycles      = 0;
-    b_wait_cycles      = 0;
-    ar_wait_cycles     = 0;
-    r_wait_cycles      = 0;
-    axi_active_cycles  = 0;
-    axi_ar_count       = 0;
-    axi_r_count        = 0;
-    axi_aw_count       = 0;
-    axi_w_count        = 0;
-    axi_b_count        = 0;
-    axi_a_read_count   = 0;
-    axi_b_read_count   = 0;
-    axi_c_read_count   = 0;
-    axi_c_write_count  = 0;
     fetch_cycles     = 0;
+    load_b_cycles    = 0;
     compute_cycles   = 0;
     writeback_cycles = 0;
-    mismatch_count   = 0;
-    max_abs_error    = 0;
-    sum_abs_error    = 0;
 
     // Program matrix wrapper registers (word addresses and dims).
     cfg_start_time = $time;
-    matrix_cfg_write(32'h0000_0000, MATRIX_WORD_BASE_A); // reg_addr_a
-    matrix_cfg_write(32'h0000_0004, MATRIX_WORD_BASE_B); // reg_addr_b
-    matrix_cfg_write(32'h0000_0008, MATRIX_WORD_BASE_C); // reg_addr_c
+    matrix_cfg_write(32'h0000_0000, matrix_word_base_a); // reg_addr_a
+    matrix_cfg_write(32'h0000_0004, matrix_word_base_b); // reg_addr_b
+    matrix_cfg_write(32'h0000_0008, matrix_word_base_c); // reg_addr_c
     matrix_cfg_write(32'h0000_000C, m_dim[31:0]);        // reg_m_num
     matrix_cfg_write(32'h0000_0010, k_dim[31:0]);        // reg_k_num
     matrix_cfg_write(32'h0000_0014, n_dim[31:0]);        // reg_n_num
@@ -1494,9 +1455,9 @@ module sim_tb_top;
     $display("CASE%0d cfg readback: A=%08h B=%08h C=%08h M=%0d K=%0d N=%0d",
              tc_idx, cfg_a, cfg_b, cfg_c, cfg_m, cfg_k, cfg_n);
 
-    if ((cfg_a !== MATRIX_WORD_BASE_A) ||
-        (cfg_b !== MATRIX_WORD_BASE_B) ||
-        (cfg_c !== MATRIX_WORD_BASE_C) ||
+    if ((cfg_a !== matrix_word_base_a) ||
+        (cfg_b !== matrix_word_base_b) ||
+        (cfg_c !== matrix_word_base_c) ||
         (cfg_m !== m_dim[31:0])       ||
         (cfg_k !== k_dim[31:0])       ||
         (cfg_n !== n_dim[31:0])) begin
@@ -1518,96 +1479,43 @@ module sim_tb_top;
     seen_done_clear = 0;
     seen_busy       = 0;
     while ((!u_ip_top.u_matrix_top_wrapper.sys_done) &&
-           (timeout_cycles < CASE_DONE_TIMEOUT_CYCLES)) begin
+           (timeout_cycles < case_timeout_cycles)) begin
       @(posedge u_ip_top.clk);
       timeout_cycles = timeout_cycles + 1;
-      run_cycles = run_cycles + 1;
 
       core_state = u_ip_top.u_matrix_top_wrapper.u_core.u_core.state;
       tile_state = u_ip_top.u_matrix_top_wrapper.u_core.t_state;
 
       if ((core_state == CORE_S_LOAD_A) || (core_state == CORE_S_LOAD_B))
         fetch_cycles = fetch_cycles + 1;
+      if (core_state == CORE_S_LOAD_B)
+        load_b_cycles = load_b_cycles + 1;
       if (core_state == CORE_S_COMPUTE)
         compute_cycles = compute_cycles + 1;
       if ((tile_state == TILE_TS_WB_START) || (tile_state == TILE_TS_WB_WAIT))
         writeback_cycles = writeback_cycles + 1;
 
-      if (u_ip_top.u_matrix_top_wrapper.sys_busy) begin
-        busy_cycles = busy_cycles + 1;
+      if (u_ip_top.u_matrix_top_wrapper.sys_busy)
         seen_busy = 1;
-      end
-
-      if (u_ip_top.matrix_dma_busy)
-        dma_busy_cycles = dma_busy_cycles + 1;
-
-      ar_hs = u_ip_top.s_axi_arvalid && u_ip_top.s_axi_arready;
-      r_hs  = u_ip_top.s_axi_rvalid  && u_ip_top.s_axi_rready;
-      aw_hs = u_ip_top.s_axi_awvalid && u_ip_top.s_axi_awready;
-      w_hs  = u_ip_top.s_axi_wvalid  && u_ip_top.s_axi_wready;
-      b_hs  = u_ip_top.s_axi_bvalid  && u_ip_top.s_axi_bready;
-
-      aw_wait = u_ip_top.s_axi_awvalid && !u_ip_top.s_axi_awready;
-      w_wait  = u_ip_top.s_axi_wvalid  && !u_ip_top.s_axi_wready;
-      b_wait  = u_ip_top.s_axi_bready  && !u_ip_top.s_axi_bvalid;
-      ar_wait = u_ip_top.s_axi_arvalid && !u_ip_top.s_axi_arready;
-      r_wait  = u_ip_top.s_axi_rready  && !u_ip_top.s_axi_rvalid;
-
-      aw_wait_cycles = aw_wait_cycles + aw_wait;
-      w_wait_cycles  = w_wait_cycles + w_wait;
-      b_wait_cycles  = b_wait_cycles + b_wait;
-      ar_wait_cycles = ar_wait_cycles + ar_wait;
-      r_wait_cycles  = r_wait_cycles + r_wait;
-
-      if (aw_wait || w_wait || b_wait || ar_wait || r_wait)
-        memory_stall_cycles = memory_stall_cycles + 1;
-
-      if (ar_hs) begin
-        axi_ar_count = axi_ar_count + 1;
-        if (u_ip_top.s_axi_araddr < AXI_BASE_B)
-          axi_a_read_count = axi_a_read_count + 1;
-        else if (u_ip_top.s_axi_araddr < AXI_BASE_C)
-          axi_b_read_count = axi_b_read_count + 1;
-        else
-          axi_c_read_count = axi_c_read_count + 1;
-      end
-
-      if (r_hs)
-        axi_r_count = axi_r_count + 1;
-
-      if (aw_hs) begin
-        axi_aw_count = axi_aw_count + 1;
-        if (u_ip_top.s_axi_awaddr >= AXI_BASE_C)
-          axi_c_write_count = axi_c_write_count + 1;
-      end
-
-      if (w_hs)
-        axi_w_count = axi_w_count + 1;
-
-      if (b_hs)
-        axi_b_count = axi_b_count + 1;
-
-      if (ar_hs || r_hs || aw_hs || w_hs || b_hs)
-        axi_active_cycles = axi_active_cycles + 1;
 
       if ((timeout_cycles % CASE_STATUS_PRINT_EVERY) == 0) begin
-        $display("CASE%0d waiting done: tile_state=%0d core_state=%0d busy=%0b dma_busy=%0b cycle=%0d ar=%0d aw=%0d w=%0d r=%0d b=%0d stall=%0d t=%0t",
+        $display("CASE%0d waiting core done: tile_state=%0d core_state=%0d busy=%0b cycle=%0d t=%0t",
                  tc_idx, tile_state, core_state, u_ip_top.u_matrix_top_wrapper.sys_busy,
-                 u_ip_top.matrix_dma_busy, timeout_cycles, axi_ar_count, axi_aw_count,
-                 axi_w_count, axi_r_count, axi_b_count, memory_stall_cycles, $time);
+                 timeout_cycles, $time);
       end
     end
 
     core_run_elapsed = $time - core_run_start_time;
 
-    if (timeout_cycles >= CASE_DONE_TIMEOUT_CYCLES) begin
+    if (timeout_cycles >= case_timeout_cycles) begin
       $display("CASE%0d TIMEOUT waiting core done: busy=%0b cycle=%0d t=%0t",
                tc_idx, u_ip_top.u_matrix_top_wrapper.sys_busy, timeout_cycles, $time);
       axi_test_fail = 1'b1;
       disable run_case;
     end
 
-    // Read status reg 0x20 after completion: bit[1]=done_latched, bit[0]=busy
+    // Read status reg after completion:
+    //   0x20 status bit[1]=done_latched bit[0]=busy
     matrix_cfg_read(32'h0000_0020, status);
     poll_count = poll_count + 1;
     if (!status[1]) seen_done_clear = 1;
@@ -1631,14 +1539,19 @@ module sim_tb_top;
                tc_idx);
     end
 
+    $display("CASE%0d matrix done: core_run=%0t fetch_cycles=%0d load_b_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move_cycles=%0d",
+             tc_idx, core_run_elapsed, fetch_cycles, load_b_cycles, compute_cycles, writeback_cycles,
+             (fetch_cycles + writeback_cycles));
+
     // Readback C and compare
+    mismatch_count = 0;
     if (PRINT_CASE_MATRIX_VALUES != 0)
       $display("CASE%0d C compare dump begin (per-row, format: exp/got)", tc_idx);
     readback_start_time = $time;
     axi_master_idle();
     for (r = 0; r < m_dim; r = r + 1) begin
       for (col_idx = 0; col_idx < n_dim; col_idx = col_idx + 1) begin
-        axi_read32(AXI_BASE_C + (((r*n_dim + col_idx) << 2)), axi_test_rdata);
+        axi_read32(axi_base_c + (((r*n_dim + col_idx) << 2)), axi_test_rdata);
         expected_c = calc_expected_elem(tc_idx, r, col_idx, k_dim);
         if (PRINT_CASE_MATRIX_VALUES != 0) begin
           if (col_idx == 0)
@@ -1654,16 +1567,6 @@ module sim_tb_top;
             $display("CASE%0d MISMATCH r=%0d c=%0d exp=%h got=%h",
                      tc_idx, r, col_idx, expected_c, axi_test_rdata);
           end
-        end
-        expected_s = $signed(expected_c);
-        got_s      = $signed(axi_test_rdata);
-        diff_abs   = expected_s - got_s;
-        if (diff_abs < 0)
-          diff_abs = -diff_abs;
-        sum_abs_error = sum_abs_error + diff_abs;
-        if (diff_abs > max_abs_error)
-          max_abs_error = diff_abs;
-        if (axi_test_rdata !== expected_c) begin
           mismatch_count = mismatch_count + 1;
           axi_test_fail  = 1'b1;
         end
@@ -1674,85 +1577,10 @@ module sim_tb_top;
     if (PRINT_CASE_MATRIX_VALUES != 0)
       $display("CASE%0d C compare dump end", tc_idx);
 
-    total_macs = m_dim * k_dim * n_dim;
-    total_outputs = m_dim * n_dim;
-    read_bytes = axi_r_count * AXI_BYTES_PER_BEAT;
-    write_bytes = axi_w_count * AXI_BYTES_PER_BEAT;
-    dma_busy_ratio = (run_cycles != 0) ? ((1.0 * dma_busy_cycles) / run_cycles) : 0.0;
-    axi_active_ratio = (run_cycles != 0) ? ((1.0 * axi_active_cycles) / run_cycles) : 0.0;
-    throughput_mac_per_cycle = (run_cycles != 0) ? ((1.0 * total_macs) / run_cycles) : 0.0;
-    pe_utilization = (run_cycles != 0) ? ((1.0 * total_macs) / (PHYSICAL_PE_COUNT * run_cycles)) : 0.0;
-    memory_stall_ratio = (run_cycles != 0) ? ((1.0 * memory_stall_cycles) / run_cycles) : 0.0;
-    mean_abs_error = (total_outputs != 0) ? ((1.0 * sum_abs_error) / total_outputs) : 0.0;
-
-    $display("CASE%0d matrix done: core_run=%0t latency_cycles=%0d busy_cycles=%0d dma_busy_cycles=%0d stall_cycles=%0d",
-             tc_idx, core_run_elapsed, run_cycles, busy_cycles, dma_busy_cycles, memory_stall_cycles);
-    $display("CASE%0d breakdown: fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move_cycles=%0d",
-             tc_idx, fetch_cycles, compute_cycles, writeback_cycles, (fetch_cycles + writeback_cycles));
-    $display("CASE%0d traffic: ar=%0d r=%0d aw=%0d w=%0d b=%0d A_reads=%0d B_reads=%0d C_reads=%0d C_writes=%0d",
-             tc_idx, axi_ar_count, axi_r_count, axi_aw_count, axi_w_count, axi_b_count,
-             axi_a_read_count, axi_b_read_count, axi_c_read_count, axi_c_write_count);
-
-    if (mismatch_count == 0) begin
-      $display("CASE%0d PASSED: cfg=%0t tb_readback=%0t pe_util=%0f stall_ratio=%0f tput=%0f",
-               tc_idx, cfg_elapsed, readback_elapsed, pe_utilization, memory_stall_ratio,
-               throughput_mac_per_cycle);
-      if (PRINT_BENCH_RESULT_CSV != 0) begin
-        $display("BENCH_RESULT,status=PASS,case_id=%0d,M=%0d,K=%0d,N=%0d,preload_ps=%0t,cfg_ps=%0t,run_ps=%0t,readback_ps=%0t,useful_macs=%0d,latency_cycles=%0d,sys_busy_cycles=%0d,dma_busy_cycles=%0d,dma_busy_ratio=%0f,physical_pe_count=%0d,pe_utilization=%0f,memory_stall_cycles=%0d,memory_stall_ratio=%0f,aw_wait_cycles=%0d,w_wait_cycles=%0d,b_wait_cycles=%0d,ar_wait_cycles=%0d,r_wait_cycles=%0d,fetch_cycles=%0d,compute_cycles=%0d,writeback_cycles=%0d,move_cycles=%0d,axi_active_cycles=%0d,axi_active_ratio=%0f,throughput_mac_per_cycle=%0f,ar_requests=%0d,aw_requests=%0d,read_beats=%0d,write_beats=%0d,b_responses=%0d,a_reads=%0d,b_reads=%0d,c_reads=%0d,c_writes=%0d,read_bytes=%0d,write_bytes=%0d,mismatch_count=%0d,max_abs_error=%0d,sum_abs_error=%0d,mean_abs_error=%0f",
-                 tc_idx, m_dim, k_dim, n_dim, case_tb_preload_time[tc_idx], cfg_elapsed, core_run_elapsed,
-                 readback_elapsed, total_macs, run_cycles, busy_cycles, dma_busy_cycles, dma_busy_ratio,
-                 PHYSICAL_PE_COUNT, pe_utilization, memory_stall_cycles, memory_stall_ratio,
-                 aw_wait_cycles, w_wait_cycles, b_wait_cycles, ar_wait_cycles, r_wait_cycles,
-                 fetch_cycles, compute_cycles, writeback_cycles, (fetch_cycles + writeback_cycles),
-                 axi_active_cycles, axi_active_ratio, throughput_mac_per_cycle, axi_ar_count, axi_aw_count,
-                 axi_r_count, axi_w_count, axi_b_count, axi_a_read_count, axi_b_read_count,
-                 axi_c_read_count, axi_c_write_count, read_bytes, write_bytes, mismatch_count,
-                 max_abs_error, sum_abs_error, mean_abs_error);
-        if (bench_csv_fd != 0) begin
-          $fdisplay(bench_csv_fd,
-                    "PASS,%0d,%0d,%0d,%0d,%0t,%0t,%0t,%0t,%0d,%0d,%0d,%0d,%0f,%0d,%0f,%0d,%0f,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0f,%0f,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0f",
-                    tc_idx, m_dim, k_dim, n_dim, case_tb_preload_time[tc_idx], cfg_elapsed,
-                    core_run_elapsed, readback_elapsed, total_macs, run_cycles, busy_cycles,
-                    dma_busy_cycles, dma_busy_ratio, PHYSICAL_PE_COUNT, pe_utilization,
-                    memory_stall_cycles, memory_stall_ratio, aw_wait_cycles, w_wait_cycles,
-                    b_wait_cycles, ar_wait_cycles, r_wait_cycles, fetch_cycles, compute_cycles,
-                    writeback_cycles, (fetch_cycles + writeback_cycles), axi_active_cycles,
-                    axi_active_ratio, throughput_mac_per_cycle, axi_ar_count, axi_aw_count,
-                    axi_r_count, axi_w_count, axi_b_count, axi_a_read_count, axi_b_read_count,
-                    axi_c_read_count, axi_c_write_count, read_bytes, write_bytes, mismatch_count,
-                    max_abs_error, sum_abs_error, mean_abs_error);
-        end
-      end
-    end else begin
-      $display("CASE%0d FAILED mismatch_count=%0d max_abs_error=%0d mean_abs_error=%0f",
-               tc_idx, mismatch_count, max_abs_error, mean_abs_error);
-      if (PRINT_BENCH_RESULT_CSV != 0) begin
-        $display("BENCH_RESULT,status=FAIL,case_id=%0d,M=%0d,K=%0d,N=%0d,preload_ps=%0t,cfg_ps=%0t,run_ps=%0t,readback_ps=%0t,useful_macs=%0d,latency_cycles=%0d,sys_busy_cycles=%0d,dma_busy_cycles=%0d,dma_busy_ratio=%0f,physical_pe_count=%0d,pe_utilization=%0f,memory_stall_cycles=%0d,memory_stall_ratio=%0f,aw_wait_cycles=%0d,w_wait_cycles=%0d,b_wait_cycles=%0d,ar_wait_cycles=%0d,r_wait_cycles=%0d,fetch_cycles=%0d,compute_cycles=%0d,writeback_cycles=%0d,move_cycles=%0d,axi_active_cycles=%0d,axi_active_ratio=%0f,throughput_mac_per_cycle=%0f,ar_requests=%0d,aw_requests=%0d,read_beats=%0d,write_beats=%0d,b_responses=%0d,a_reads=%0d,b_reads=%0d,c_reads=%0d,c_writes=%0d,read_bytes=%0d,write_bytes=%0d,mismatch_count=%0d,max_abs_error=%0d,sum_abs_error=%0d,mean_abs_error=%0f",
-                 tc_idx, m_dim, k_dim, n_dim, case_tb_preload_time[tc_idx], cfg_elapsed, core_run_elapsed,
-                 readback_elapsed, total_macs, run_cycles, busy_cycles, dma_busy_cycles, dma_busy_ratio,
-                 PHYSICAL_PE_COUNT, pe_utilization, memory_stall_cycles, memory_stall_ratio,
-                 aw_wait_cycles, w_wait_cycles, b_wait_cycles, ar_wait_cycles, r_wait_cycles,
-                 fetch_cycles, compute_cycles, writeback_cycles, (fetch_cycles + writeback_cycles),
-                 axi_active_cycles, axi_active_ratio, throughput_mac_per_cycle, axi_ar_count, axi_aw_count,
-                 axi_r_count, axi_w_count, axi_b_count, axi_a_read_count, axi_b_read_count,
-                 axi_c_read_count, axi_c_write_count, read_bytes, write_bytes, mismatch_count,
-                 max_abs_error, sum_abs_error, mean_abs_error);
-        if (bench_csv_fd != 0) begin
-          $fdisplay(bench_csv_fd,
-                    "FAIL,%0d,%0d,%0d,%0d,%0t,%0t,%0t,%0t,%0d,%0d,%0d,%0d,%0f,%0d,%0f,%0d,%0f,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0f,%0f,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0f",
-                    tc_idx, m_dim, k_dim, n_dim, case_tb_preload_time[tc_idx], cfg_elapsed,
-                    core_run_elapsed, readback_elapsed, total_macs, run_cycles, busy_cycles,
-                    dma_busy_cycles, dma_busy_ratio, PHYSICAL_PE_COUNT, pe_utilization,
-                    memory_stall_cycles, memory_stall_ratio, aw_wait_cycles, w_wait_cycles,
-                    b_wait_cycles, ar_wait_cycles, r_wait_cycles, fetch_cycles, compute_cycles,
-                    writeback_cycles, (fetch_cycles + writeback_cycles), axi_active_cycles,
-                    axi_active_ratio, throughput_mac_per_cycle, axi_ar_count, axi_aw_count,
-                    axi_r_count, axi_w_count, axi_b_count, axi_a_read_count, axi_b_read_count,
-                    axi_c_read_count, axi_c_write_count, read_bytes, write_bytes, mismatch_count,
-                    max_abs_error, sum_abs_error, mean_abs_error);
-        end
-      end
-    end
+    if (mismatch_count == 0)
+      $display("CASE%0d PASSED: cfg=%0t tb_readback=%0t", tc_idx, cfg_elapsed, readback_elapsed);
+    else
+      $display("CASE%0d FAILED mismatch_count=%0d", tc_idx, mismatch_count);
   end
   endtask
 
@@ -1765,105 +1593,36 @@ module sim_tb_top;
      integer m_dim;
      integer k_dim;
      integer n_dim;
+     integer case_timeout_cycles;
+     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_case_base_a;
+     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_case_base_b;
+     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_case_base_c;
+     reg [31:0] matrix_word_base_a;
+     reg [31:0] matrix_word_base_b;
+     reg [31:0] matrix_word_base_c;
      integer sum_fetch_cycles;
+     integer sum_load_b_cycles;
      integer sum_compute_cycles;
      integer sum_writeback_cycles;
      integer sum_move_cycles;
-     integer sum_run_cycles;
-     integer sum_busy_cycles;
-     integer sum_dma_busy_cycles;
-     integer sum_memory_stall_cycles;
-     integer sum_aw_wait_cycles;
-     integer sum_w_wait_cycles;
-     integer sum_b_wait_cycles;
-     integer sum_ar_wait_cycles;
-     integer sum_r_wait_cycles;
-     integer sum_axi_active_cycles;
-     integer sum_axi_ar_count;
-     integer sum_axi_r_count;
-     integer sum_axi_aw_count;
-     integer sum_axi_w_count;
-     integer sum_axi_b_count;
-     integer sum_axi_a_read_count;
-     integer sum_axi_b_read_count;
-     integer sum_axi_c_read_count;
-     integer sum_axi_c_write_count;
-     integer sum_mismatch_count;
-     integer max_case_abs_error;
-     integer sum_abs_error_all;
      time    sum_tb_preload_time;
      time    sum_cfg_time;
      time    sum_core_run_time;
      time    sum_tb_readback_time;
      time    preload_start_time;
      time    preload_elapsed;
-     real    case_throughput;
-     real    case_pe_utilization;
-     real    case_memory_stall_ratio;
-     real    case_mean_abs_error;
-     real    sum_throughput;
-     real    sum_pe_utilization;
-     real    sum_memory_stall_ratio;
-     real    min_throughput;
-     real    max_throughput;
-     real    min_pe_utilization;
-     real    max_pe_utilization;
-     real    min_memory_stall_ratio;
-     real    max_memory_stall_ratio;
 
      axi_test_fail  = 1'b0;
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
-     bench_csv_fd = 0;
      sum_fetch_cycles   = 0;
+     sum_load_b_cycles  = 0;
      sum_compute_cycles = 0;
      sum_writeback_cycles = 0;
      sum_move_cycles    = 0;
-     sum_run_cycles     = 0;
-     sum_busy_cycles    = 0;
-     sum_dma_busy_cycles = 0;
-     sum_memory_stall_cycles = 0;
-     sum_aw_wait_cycles = 0;
-     sum_w_wait_cycles  = 0;
-     sum_b_wait_cycles  = 0;
-     sum_ar_wait_cycles = 0;
-     sum_r_wait_cycles  = 0;
-     sum_axi_active_cycles = 0;
-     sum_axi_ar_count   = 0;
-     sum_axi_r_count    = 0;
-     sum_axi_aw_count   = 0;
-     sum_axi_w_count    = 0;
-     sum_axi_b_count    = 0;
-     sum_axi_a_read_count = 0;
-     sum_axi_b_read_count = 0;
-     sum_axi_c_read_count = 0;
-     sum_axi_c_write_count = 0;
-     sum_mismatch_count = 0;
-     max_case_abs_error = 0;
-     sum_abs_error_all  = 0;
      sum_tb_preload_time = 0;
      sum_cfg_time        = 0;
      sum_core_run_time   = 0;
      sum_tb_readback_time = 0;
-     sum_throughput      = 0.0;
-     sum_pe_utilization  = 0.0;
-     sum_memory_stall_ratio = 0.0;
-     min_throughput      = 0.0;
-     max_throughput      = 0.0;
-     min_pe_utilization  = 0.0;
-     max_pe_utilization  = 0.0;
-     min_memory_stall_ratio = 0.0;
-     max_memory_stall_ratio = 0.0;
-
-     if (PRINT_BENCH_RESULT_CSV != 0) begin
-       bench_csv_fd = $fopen("benchmark_results.csv", "w");
-       if (bench_csv_fd == 0) begin
-         $display("WARNING: could not open benchmark_results.csv for writing");
-       end else begin
-         $display("Writing benchmark rows to benchmark_results.csv");
-         $fdisplay(bench_csv_fd,
-                   "status,case_id,M,K,N,preload_ps,cfg_ps,run_ps,readback_ps,useful_macs,latency_cycles,sys_busy_cycles,dma_busy_cycles,dma_busy_ratio,physical_pe_count,pe_utilization,memory_stall_cycles,memory_stall_ratio,aw_wait_cycles,w_wait_cycles,b_wait_cycles,ar_wait_cycles,r_wait_cycles,fetch_cycles,compute_cycles,writeback_cycles,move_cycles,axi_active_cycles,axi_active_ratio,throughput_mac_per_cycle,ar_requests,aw_requests,read_beats,write_beats,b_responses,a_reads,b_reads,c_reads,c_writes,read_bytes,write_bytes,mismatch_count,max_abs_error,sum_abs_error,mean_abs_error");
-       end
-     end
 
      fork
         begin : run_matrix_multicase
@@ -1877,132 +1636,64 @@ module sim_tb_top;
 
            for (tc = 0; tc < NUM_CASES; tc = tc + 1) begin
              get_case_dims(tc, m_dim, k_dim, n_dim);
+             get_case_layout(m_dim, k_dim, n_dim,
+                             axi_case_base_a, axi_case_base_b, axi_case_base_c,
+                             matrix_word_base_a, matrix_word_base_b, matrix_word_base_c);
+             get_case_timeout_cycles(m_dim, k_dim, n_dim, case_timeout_cycles);
              preload_start_time = $time;
-             preload_case_data(tc, m_dim, k_dim, n_dim);
+             preload_case_data(tc, m_dim, k_dim, n_dim,
+                               axi_case_base_a, axi_case_base_b, axi_case_base_c);
              preload_elapsed = $time - preload_start_time;
              case_tb_preload_time[tc] = preload_elapsed;
-             $display("CASE%0d preload done: A@%h B@%h C@%h", tc, AXI_BASE_A, AXI_BASE_B, AXI_BASE_C);
+             $display("CASE%0d preload done: A@%h B@%h C@%h wordA=%0d wordB=%0d wordC=%0d",
+                      tc, axi_case_base_a, axi_case_base_b, axi_case_base_c,
+                      matrix_word_base_a, matrix_word_base_b, matrix_word_base_c);
              run_case(tc, m_dim, k_dim, n_dim,
+                      axi_case_base_a, axi_case_base_b, axi_case_base_c,
+                      matrix_word_base_a, matrix_word_base_b, matrix_word_base_c,
+                      case_timeout_cycles,
                       case_cfg_time[tc], case_core_run_time[tc], case_tb_readback_time[tc],
-                      case_run_cycles[tc], case_busy_cycles[tc], case_dma_busy_cycles[tc],
-                      case_memory_stall_cycles[tc], case_aw_wait_cycles[tc],
-                      case_w_wait_cycles[tc], case_b_wait_cycles[tc], case_ar_wait_cycles[tc],
-                      case_r_wait_cycles[tc], case_axi_active_cycles[tc], case_axi_ar_count[tc],
-                      case_axi_r_count[tc], case_axi_aw_count[tc], case_axi_w_count[tc],
-                      case_axi_b_count[tc], case_axi_a_read_count[tc], case_axi_b_read_count[tc],
-                      case_axi_c_read_count[tc], case_axi_c_write_count[tc],
-                      case_core_fetch_cycles[tc], case_core_compute_cycles[tc],
-                      case_core_writeback_cycles[tc], case_mismatch_count[tc],
-                      case_max_abs_error[tc], case_sum_abs_error[tc]);
+                      case_core_fetch_cycles[tc], case_core_load_b_cycles[tc], case_core_compute_cycles[tc],
+                      case_core_writeback_cycles[tc]);
              case_core_move_cycles[tc] = case_core_fetch_cycles[tc] + case_core_writeback_cycles[tc];
-             case_throughput = (case_run_cycles[tc] != 0) ?
-                               ((1.0 * m_dim * k_dim * n_dim) / case_run_cycles[tc]) : 0.0;
-             case_pe_utilization = (case_run_cycles[tc] != 0) ?
-                                   ((1.0 * m_dim * k_dim * n_dim) / (PHYSICAL_PE_COUNT * case_run_cycles[tc])) : 0.0;
-             case_memory_stall_ratio = (case_run_cycles[tc] != 0) ?
-                                       ((1.0 * case_memory_stall_cycles[tc]) / case_run_cycles[tc]) : 0.0;
-             case_mean_abs_error = ((m_dim * n_dim) != 0) ?
-                                   ((1.0 * case_sum_abs_error[tc]) / (m_dim * n_dim)) : 0.0;
 
              sum_tb_preload_time = sum_tb_preload_time + case_tb_preload_time[tc];
              sum_cfg_time        = sum_cfg_time + case_cfg_time[tc];
              sum_core_run_time   = sum_core_run_time + case_core_run_time[tc];
              sum_tb_readback_time = sum_tb_readback_time + case_tb_readback_time[tc];
-             sum_run_cycles      = sum_run_cycles + case_run_cycles[tc];
-             sum_busy_cycles     = sum_busy_cycles + case_busy_cycles[tc];
-             sum_dma_busy_cycles = sum_dma_busy_cycles + case_dma_busy_cycles[tc];
-             sum_memory_stall_cycles = sum_memory_stall_cycles + case_memory_stall_cycles[tc];
-             sum_aw_wait_cycles  = sum_aw_wait_cycles + case_aw_wait_cycles[tc];
-             sum_w_wait_cycles   = sum_w_wait_cycles + case_w_wait_cycles[tc];
-             sum_b_wait_cycles   = sum_b_wait_cycles + case_b_wait_cycles[tc];
-             sum_ar_wait_cycles  = sum_ar_wait_cycles + case_ar_wait_cycles[tc];
-             sum_r_wait_cycles   = sum_r_wait_cycles + case_r_wait_cycles[tc];
-             sum_axi_active_cycles = sum_axi_active_cycles + case_axi_active_cycles[tc];
-             sum_axi_ar_count    = sum_axi_ar_count + case_axi_ar_count[tc];
-             sum_axi_r_count     = sum_axi_r_count + case_axi_r_count[tc];
-             sum_axi_aw_count    = sum_axi_aw_count + case_axi_aw_count[tc];
-             sum_axi_w_count     = sum_axi_w_count + case_axi_w_count[tc];
-             sum_axi_b_count     = sum_axi_b_count + case_axi_b_count[tc];
-             sum_axi_a_read_count = sum_axi_a_read_count + case_axi_a_read_count[tc];
-             sum_axi_b_read_count = sum_axi_b_read_count + case_axi_b_read_count[tc];
-             sum_axi_c_read_count = sum_axi_c_read_count + case_axi_c_read_count[tc];
-             sum_axi_c_write_count = sum_axi_c_write_count + case_axi_c_write_count[tc];
              sum_fetch_cycles    = sum_fetch_cycles + case_core_fetch_cycles[tc];
+             sum_load_b_cycles   = sum_load_b_cycles + case_core_load_b_cycles[tc];
              sum_compute_cycles  = sum_compute_cycles + case_core_compute_cycles[tc];
              sum_writeback_cycles = sum_writeback_cycles + case_core_writeback_cycles[tc];
              sum_move_cycles     = sum_move_cycles + case_core_move_cycles[tc];
-             sum_mismatch_count  = sum_mismatch_count + case_mismatch_count[tc];
-             sum_abs_error_all   = sum_abs_error_all + case_sum_abs_error[tc];
-             if (case_max_abs_error[tc] > max_case_abs_error)
-               max_case_abs_error = case_max_abs_error[tc];
-             sum_throughput      = sum_throughput + case_throughput;
-             sum_pe_utilization  = sum_pe_utilization + case_pe_utilization;
-             sum_memory_stall_ratio = sum_memory_stall_ratio + case_memory_stall_ratio;
-             if ((tc == 0) || (case_throughput < min_throughput))
-               min_throughput = case_throughput;
-             if ((tc == 0) || (case_throughput > max_throughput))
-               max_throughput = case_throughput;
-             if ((tc == 0) || (case_pe_utilization < min_pe_utilization))
-               min_pe_utilization = case_pe_utilization;
-             if ((tc == 0) || (case_pe_utilization > max_pe_utilization))
-               max_pe_utilization = case_pe_utilization;
-             if ((tc == 0) || (case_memory_stall_ratio < min_memory_stall_ratio))
-               min_memory_stall_ratio = case_memory_stall_ratio;
-             if ((tc == 0) || (case_memory_stall_ratio > max_memory_stall_ratio))
-               max_memory_stall_ratio = case_memory_stall_ratio;
 
-             $display("CASE%0d timing summary: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t latency_cycles=%0d dma_busy_cycles=%0d stall_cycles=%0d fetch_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move/compute=%0f",
+             $display("CASE%0d timing summary: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t fetch_cycles=%0d load_b_cycles=%0d compute_cycles=%0d writeback_cycles=%0d move/compute=%0f",
                       tc,
                       case_tb_preload_time[tc],
                       case_cfg_time[tc],
                       case_core_run_time[tc],
                       case_tb_readback_time[tc],
-                      case_run_cycles[tc],
-                      case_dma_busy_cycles[tc],
-                      case_memory_stall_cycles[tc],
                       case_core_fetch_cycles[tc],
+                      case_core_load_b_cycles[tc],
                       case_core_compute_cycles[tc],
                       case_core_writeback_cycles[tc],
                       (case_core_compute_cycles[tc] != 0) ?
                       ((1.0 * case_core_move_cycles[tc]) / case_core_compute_cycles[tc]) : 0.0);
            end
 
-           $display("BENCHMARK TOTAL TIME: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t",
+           $display("MATRIX TIMING TOTAL: tb_preload=%0t cfg=%0t core_run=%0t tb_readback=%0t",
                     sum_tb_preload_time, sum_cfg_time, sum_core_run_time, sum_tb_readback_time);
-           $display("BENCHMARK TOTAL COUNTS: run_cycles=%0d busy_cycles=%0d dma_busy_cycles=%0d stall_cycles=%0d ar=%0d r=%0d aw=%0d w=%0d b=%0d A_reads=%0d B_reads=%0d C_reads=%0d C_writes=%0d",
-                    sum_run_cycles, sum_busy_cycles, sum_dma_busy_cycles, sum_memory_stall_cycles,
-                    sum_axi_ar_count, sum_axi_r_count, sum_axi_aw_count, sum_axi_w_count, sum_axi_b_count,
-                    sum_axi_a_read_count, sum_axi_b_read_count, sum_axi_c_read_count, sum_axi_c_write_count);
-           $display("BENCHMARK WAIT COUNTS: aw=%0d w=%0d b=%0d ar=%0d r=%0d",
-                    sum_aw_wait_cycles, sum_w_wait_cycles, sum_b_wait_cycles, sum_ar_wait_cycles,
-                    sum_r_wait_cycles);
-           $display("BENCHMARK PIPELINE TOTAL CYCLES: fetch=%0d compute=%0d writeback=%0d move=%0d move/compute=%0f",
-                    sum_fetch_cycles, sum_compute_cycles, sum_writeback_cycles, sum_move_cycles,
+           $display("MATRIX TIMING TOTAL CYCLES: fetch=%0d load_b=%0d compute=%0d writeback=%0d move=%0d move/compute=%0f",
+                    sum_fetch_cycles, sum_load_b_cycles, sum_compute_cycles, sum_writeback_cycles, sum_move_cycles,
                     (sum_compute_cycles != 0) ? ((1.0 * sum_move_cycles) / sum_compute_cycles) : 0.0);
-           $display("CROSS_WORKLOAD_SUMMARY: cases=%0d throughput_mean=%0f throughput_min=%0f throughput_max=%0f pe_util_mean=%0f pe_util_min=%0f pe_util_max=%0f stall_mean=%0f stall_min=%0f stall_max=%0f total_mismatches=%0d max_abs_error=%0d sum_abs_error=%0d",
-                    NUM_CASES,
-                    (NUM_CASES != 0) ? (sum_throughput / NUM_CASES) : 0.0,
-                    min_throughput,
-                    max_throughput,
-                    (NUM_CASES != 0) ? (sum_pe_utilization / NUM_CASES) : 0.0,
-                    min_pe_utilization,
-                    max_pe_utilization,
-                    (NUM_CASES != 0) ? (sum_memory_stall_ratio / NUM_CASES) : 0.0,
-                    min_memory_stall_ratio,
-                    max_memory_stall_ratio,
-                    sum_mismatch_count,
-                    max_case_abs_error,
-                    sum_abs_error_all);
 
            if (!axi_test_fail)
-             $display("TEST PASSED: VIVADO MATRIX BENCHMARK (%0d cases)", NUM_CASES);
+             $display("TEST PASSED: OUTPUT-STATIONARY LARGE-MATRIX MULTI-CASE (%0d cases)", NUM_CASES);
            else
-             $display("TEST FAILED: VIVADO MATRIX BENCHMARK");
+             $display("TEST FAILED: OUTPUT-STATIONARY LARGE-MATRIX MULTI-CASE");
 
            matrix_cfg_release();
            release u_ip_top.matrix_cfg_state;
-           if (bench_csv_fd != 0)
-             $fclose(bench_csv_fd);
 
            disable test_timeout;
            $finish;
@@ -2017,10 +1708,7 @@ module sim_tb_top;
            if (!init_calib_complete)
              $display("TEST FAILED: INITIALIZATION DID NOT COMPLETE");
            else
-             $display("TEST FAILED: VIVADO MATRIX BENCHMARK TIMEOUT");
-
-           if (bench_csv_fd != 0)
-             $fclose(bench_csv_fd);
+             $display("TEST FAILED: OUTPUT-STATIONARY LARGE-MATRIX MULTI-CASE TIMEOUT");
 
            disable run_matrix_multicase;
            $finish;

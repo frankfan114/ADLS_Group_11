@@ -769,7 +769,6 @@ module example_top #
    output                                       init_calib_complete,
 
 
-   input  [11:0]                                device_temp_i,
 
 
                       // The 12 MSB bits of the temperature sensor transfer
@@ -1135,7 +1134,8 @@ function integer clogb2 (input integer size);
   wire [DBG_RD_STS_WIDTH-1:0]       dbg_rd_sts;
 
 
-  wire [11:0]                           device_temp;
+  wire [31:0]                       matrix_axi_awaddr_full;
+  wire [31:0]                       matrix_axi_araddr_full;
 
 
   
@@ -1154,12 +1154,17 @@ function integer clogb2 (input integer size);
   wire                              matrix_dma_busy;
   reg                               matrix_done_latched;
 
+  // RSA/ADAPTNET-friendly default single run for Vivado example-top bring-up.
+  // The real multi-case verification is driven by rsa_ws/sim_tb_top.v.
   localparam [31:0] MATRIX_ADDR_A = 32'd0;
   localparam [31:0] MATRIX_ADDR_B = 32'd1024;
   localparam [31:0] MATRIX_ADDR_C = 32'd2048;
-  localparam [31:0] MATRIX_M_DIM  = 32'd8;
+  localparam [31:0] MATRIX_M_DIM  = 32'd32;
   localparam [31:0] MATRIX_K_DIM  = 32'd8;
   localparam [31:0] MATRIX_N_DIM  = 32'd8;
+  localparam [31:0] MATRIX_CFG_CTRL = 32'd1;
+  localparam [31:0] MATRIX_ROW_MASK = 32'h0000_00FF;
+  localparam [31:0] MATRIX_COL_MASK = 32'h0000_00FF;
 
   localparam [3:0] MATRIX_CFG_IDLE     = 4'd0,
                    MATRIX_CFG_WR_A     = 4'd1,
@@ -1168,11 +1173,17 @@ function integer clogb2 (input integer size);
                    MATRIX_CFG_WR_M     = 4'd4,
                    MATRIX_CFG_WR_K     = 4'd5,
                    MATRIX_CFG_WR_N     = 4'd6,
-                   MATRIX_CFG_WR_START = 4'd7,
-                   MATRIX_CFG_POLL     = 4'd8,
-                   MATRIX_CFG_DONE     = 4'd9;
+                   MATRIX_CFG_WR_CTRL  = 4'd7,
+                   MATRIX_CFG_WR_ROW   = 4'd8,
+                   MATRIX_CFG_WR_COL   = 4'd9,
+                   MATRIX_CFG_WR_START = 4'd10,
+                   MATRIX_CFG_POLL     = 4'd11,
+                   MATRIX_CFG_DONE     = 4'd12;
 
   reg [3:0] matrix_cfg_state;
+
+  assign s_axi_awaddr = matrix_axi_awaddr_full[C_S_AXI_ADDR_WIDTH-1:0];
+  assign s_axi_araddr = matrix_axi_araddr_full[C_S_AXI_ADDR_WIDTH-1:0];
 `ifdef SKIP_CALIB
 
 
@@ -1260,7 +1271,7 @@ function integer clogb2 (input integer size);
 
 
 
-  mig_7series_1 u_mig_7series_1
+  mig_7series_0 u_mig_7series_0
 
 
       (
@@ -1518,11 +1529,6 @@ function integer clogb2 (input integer size);
        .clk_ref_n                      (clk_ref_n),
 
 
-       .device_temp_i                  (device_temp_i),
-
-
-       .device_temp            (device_temp),
-
 
        `ifdef SKIP_CALIB
 
@@ -1637,6 +1643,30 @@ function integer clogb2 (input integer size);
 
          MATRIX_CFG_WR_N: begin
            if (matrix_bus_ready) begin
+             matrix_cfg_state <= MATRIX_CFG_WR_CTRL;
+             matrix_bus_addr  <= 32'h0000_0024; // reg_cfg_ctrl
+             matrix_bus_wdata <= MATRIX_CFG_CTRL;
+           end
+         end
+
+         MATRIX_CFG_WR_CTRL: begin
+           if (matrix_bus_ready) begin
+             matrix_cfg_state <= MATRIX_CFG_WR_ROW;
+             matrix_bus_addr  <= 32'h0000_0028; // reg_row_mask
+             matrix_bus_wdata <= MATRIX_ROW_MASK;
+           end
+         end
+
+         MATRIX_CFG_WR_ROW: begin
+           if (matrix_bus_ready) begin
+             matrix_cfg_state <= MATRIX_CFG_WR_COL;
+             matrix_bus_addr  <= 32'h0000_002C; // reg_col_mask
+             matrix_bus_wdata <= MATRIX_COL_MASK;
+           end
+         end
+
+         MATRIX_CFG_WR_COL: begin
+           if (matrix_bus_ready) begin
              matrix_cfg_state <= MATRIX_CFG_WR_START;
              matrix_bus_addr  <= 32'h0000_001C; // control/start
              matrix_bus_wdata <= 32'h0000_0001;
@@ -1693,7 +1723,7 @@ function integer clogb2 (input integer size);
      .bus_rdata    (matrix_bus_rdata),
 
      .m_axi_awid   (s_axi_awid),
-     .m_axi_awaddr (s_axi_awaddr),
+     .m_axi_awaddr (matrix_axi_awaddr_full),
      .m_axi_awlen  (s_axi_awlen),
      .m_axi_awsize (s_axi_awsize),
      .m_axi_awburst(s_axi_awburst),
@@ -1715,7 +1745,7 @@ function integer clogb2 (input integer size);
      .m_axi_bready (s_axi_bready),
 
      .m_axi_arid   (s_axi_arid),
-     .m_axi_araddr (s_axi_araddr),
+     .m_axi_araddr (matrix_axi_araddr_full),
      .m_axi_arlen  (s_axi_arlen),
      .m_axi_arsize (s_axi_arsize),
      .m_axi_arburst(s_axi_arburst),
