@@ -116,6 +116,35 @@ class QuantConv2d(nn.Module):
     def bias(self):
         return self._conv.bias
 
+    # Expose Conv2d attributes for toolchains (e.g., Ultralytics fuse_conv_and_bn).
+    @property
+    def in_channels(self):
+        return self._conv.in_channels
+
+    @property
+    def out_channels(self):
+        return self._conv.out_channels
+
+    @property
+    def kernel_size(self):
+        return self._conv.kernel_size
+
+    @property
+    def stride(self):
+        return self._conv.stride
+
+    @property
+    def padding(self):
+        return self._conv.padding
+
+    @property
+    def dilation(self):
+        return self._conv.dilation
+
+    @property
+    def groups(self):
+        return self._conv.groups
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         w = _symmetric_quantize(self._conv.weight, self.bit_width, self.frac_width)
         b = _symmetric_quantize(self._conv.bias, self.bit_width, self.frac_width) if self._conv.bias is not None else None
