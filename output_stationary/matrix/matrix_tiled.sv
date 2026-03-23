@@ -93,8 +93,8 @@ module matrix_tiled #(
     logic [ADDR_WIDTH-1:0] base_addr_B_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_C_tile_r;
 
-    // 控制：本次 TS_INIT_TILE 是否要保留 accumulator（用于 K-continue）
-    logic init_keep_accum; // 1 => TS_INIT_TILE 不清 accum
+    // Controls whether this TS_INIT_TILE entry should preserve the accumulator for K-continue.
+    logic init_keep_accum; // 1 => do not clear accum in TS_INIT_TILE
 
     // latch keep flag on transition into TS_INIT_TILE from TS_ACCUM (k-continue)
     always_ff @(posedge clk or negedge rst_n) begin
@@ -322,7 +322,12 @@ module matrix_tiled #(
 
         case (t_state)
             TS_IDLE: begin
-                if (start) t_state_n = TS_INIT_TILE;
+                if (start) begin
+                    if ((glob_m_num == 0) || (glob_k_num == 0) || (glob_n_num == 0))
+                        t_state_n = TS_DONE;
+                    else
+                        t_state_n = TS_INIT_TILE;
+                end
             end
 
             TS_INIT_TILE: begin

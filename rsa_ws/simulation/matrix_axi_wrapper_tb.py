@@ -461,6 +461,10 @@ async def test_matrix_top_wrapper_axi(dut):
         dict(case_name="smoke_dense_auto", M=8, K=8, N=8, data_mode="random", baseA_word=0, baseB_word=2048, baseC_word=4096),
         dict(case_name="odd_sizes_auto", M=5, K=11, N=7, data_mode="ramp", baseA_word=101, baseB_word=2401, baseC_word=4096),
         dict(case_name="zero_m_auto", M=0, K=5, N=7, data_mode="random", baseA_word=211, baseB_word=2601, baseC_word=4801),
+        dict(case_name="zero_k_auto", M=6, K=0, N=4, data_mode="random", baseA_word=311, baseB_word=2801, baseC_word=5201),
+        dict(case_name="zero_n_auto", M=5, K=7, N=0, data_mode="random", baseA_word=419, baseB_word=3001, baseC_word=5601),
+        dict(case_name="max_values_auto", M=5, K=8, N=7, data_mode="max", baseA_word=503, baseB_word=3401, baseC_word=6201, wait_prob=0.0, max_wait=1),
+        dict(case_name="min_values_auto", M=7, K=8, N=5, data_mode="min", baseA_word=619, baseB_word=3801, baseC_word=7001, wait_prob=0.0, max_wait=1),
     ]
 
     for case in basic_cases:
@@ -577,15 +581,55 @@ async def test_matrix_top_wrapper_axi(dut):
         await reset_dut(dut)
         await run_one_case(dut, mem, **case)
 
+    repeat_cases = [
+        dict(
+            case_name="repeat_manual_same_output_base",
+            M=4,
+            K=8,
+            N=8,
+            data_mode="one",
+            baseA_word=42000,
+            baseB_word=44000,
+            baseC_word=46000,
+            auto_cfg_en=False,
+            row_mask=0x0F,
+            col_mask=0xFF,
+            expected_cfg_id=0x80,
+            expected_active_rows=4,
+            expected_active_cols=8,
+            expected_row_mask=0x0F,
+            expected_col_mask=0xFF,
+        ),
+        dict(
+            case_name="repeat_auto_same_output_base",
+            M=4,
+            K=8,
+            N=4,
+            data_mode="random",
+            baseA_word=48000,
+            baseB_word=50000,
+            baseC_word=46000,
+            expected_cfg_id=3,
+            expected_active_rows=4,
+            expected_active_cols=4,
+            expected_row_mask=0x0F,
+            expected_col_mask=0x0F,
+        ),
+    ]
+
+    await reset_dut(dut)
+    for case in repeat_cases:
+        await run_one_case(dut, mem, **case)
+
     reuse_case = dict(
         case_name="manual_4x8_b_reuse",
         M=16,
         K=8,
         N=8,
         data_mode="random",
-        baseA_word=42000,
-        baseB_word=44000,
-        baseC_word=46000,
+        baseA_word=52000,
+        baseB_word=54000,
+        baseC_word=56000,
         auto_cfg_en=False,
         row_mask=0x0F,
         col_mask=0xFF,
