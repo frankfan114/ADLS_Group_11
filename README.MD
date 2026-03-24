@@ -1,5 +1,53 @@
-python -c "from pathlib import Path; from cocotb_tools.runner import get_runner; rtl=Path(r'd:\Document\ADL_Group_11\weight_stationary\rtl'); sim=Path(r'd:\Document\ADL_Group_11\weight_stationary\simulation'); sources=[str(rtl/'matrix_fetch.sv'),str(rtl/'matrix_pe.sv'),str(rtl/'matrix_systolic_array.sv'),str(rtl/'matrix_core.sv'),str(rtl/'matrix_writeback.sv'),str(rtl/'matrix_tiled.sv'),str(rtl/'matrix_axi_master_bridge.sv'),str(rtl/'matrix_top_wrapper.v')]; r=get_runner('icarus'); r.build(verilog_sources=sources, hdl_toplevel='matrix_top_wrapper', build_dir=str(sim/'sim_build_matrix_wrapper'), always=True); r.test(hdl_toplevel='matrix_top_wrapper', test_module='matrix_axi_wrapper_tb', test_dir=str(sim), results_xml=str(sim/'matrix_wrapper_results.xml'))"
+# ADL Variant Branch
 
-iverilog -g2012 -s matrix_top_wrapper -o .\matrix_top_wrapper_ws_check.vvp ..\rtl\matrix_fetch.sv ..\rtl\matrix_pe.sv ..\rtl\matrix_systolic_array.sv ..\rtl\matrix_core.sv ..\rtl\matrix_writeback.sv ..\rtl\matrix_tiled.sv ..\rtl\matrix_axi_master_bridge.sv ..\rtl\matrix_top_wrapper.v
+This branch is organized around two kinds of content:
 
-iverilog -g2012 -s matrix_tiled -o .\matrix_tiled_ws_check.vvp ..\rtl\matrix_fetch.sv ..\rtl\matrix_pe.sv ..\rtl\matrix_systolic_array.sv ..\rtl\matrix_core.sv ..\rtl\matrix_writeback.sv ..\rtl\matrix_tiled.sv
+- reusable design variants under their own implementation folders
+- layer-specific bring-up cases that reuse the MIG `example_top` flow
+
+## Design Variants
+
+- `weight_stationary/`: baseline weight-stationary array
+- `output_stationary/`: baseline output-stationary array
+- `os_pp/`: output-stationary with ping-pong writeback path
+- `ws_pp/`: weight-stationary with ping-pong writeback path
+- `rsa_ws/`: adaptive weight-stationary variant with runtime array selection
+- `smt_sa/`: alternate systolic-array variant used for comparison
+
+Each design variant keeps the same top-level structure when available:
+
+- `rtl/`: synthesizable RTL
+- `simulation/`: cocotb / Icarus regression collateral
+- `vivado/`: Vivado `example_top` bring-up collateral
+
+`rsa_ws/README.md` contains the detailed regression command for the adaptive WS design.
+
+## Layer Cases
+
+- `bert_layer/`: baked BERT Tiny classifier case with dimensions `M=32`, `K=128`, `N=2`
+- `mnist_layer/`: baked MNIST MLP classifier case with dimensions `M=16`, `K=16`, `N=10`
+
+Both layer-case folders follow the same layout:
+
+- `example_top.v`: single-case Vivado bring-up wrapper
+- `sim_tb_top.v`: multi-case benchmark / verification testbench
+- `*.vh`: baked case data consumed by `sim_tb_top.v`
+
+Tracked benchmark snapshots are kept at the repository root:
+
+- `bert_layer_4_4_32x128x2.csv`
+- `bert_layer_8_8_32x128x2.csv`
+- `mnist_layer_4_4_16x16x10.csv`
+- `mnist_layer_8_8_16x16x10.csv`
+
+If a layer testbench is run with a nonstandard array shape, it falls back to a `*_case0_*.csv` file name. Those scratch outputs are ignored in `.gitignore`.
+
+## Reports
+
+- `resource.md`: consolidated Vivado utilization reports for checked-in `example_top` builds
+
+## Quick Start
+
+- Use the design-variant folders for reusable RTL and cocotb regressions.
+- Use `bert_layer/sim_tb_top.v` and `mnist_layer/sim_tb_top.v` for layer-level benchmark bring-up.
+- Use the root CSV snapshots for quick resource / latency comparisons across array sizes.

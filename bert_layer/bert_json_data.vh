@@ -3,7 +3,7 @@
 // A := input [M x K], row-major
 // B := transpose(weight [N x K]) -> [K x N], row-major over K then N
 // OUT := output [M x N], row-major (raw int32, no bias, no scale)
-// RSA auto-config expectation in rsa_ws_layer/sim_tb_top.v: cfg_id=5, rows=8, cols=2
+// BERT-layer auto-config expectation in bert_layer/sim_tb_top.v: cfg_id=5, rows=8, cols=2
   initial begin : init_case0_json_data
     case0_a_json[0] = 8'hF9;
     case0_a_json[1] = 8'hFB;

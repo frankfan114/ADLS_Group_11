@@ -1157,8 +1157,8 @@ function integer clogb2 (input integer size);
   wire                              matrix_dma_busy;
   reg                               matrix_done_latched;
 
-  // MINST-layer-friendly default single run for Vivado example-top bring-up.
-  // The real multi-case verification is driven by minst_layer/sim_tb_top.v.
+  // MNIST-layer-friendly default single run for Vivado example-top bring-up.
+  // The real multi-case verification is driven by mnist_layer/sim_tb_top.v.
   localparam [31:0] MATRIX_ADDR_A = 32'd0;
   localparam [31:0] MATRIX_ADDR_B = 32'd1024;
   localparam [31:0] MATRIX_ADDR_C = 32'd2048;

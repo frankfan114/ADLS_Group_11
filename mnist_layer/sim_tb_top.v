@@ -2100,7 +2100,7 @@ module sim_tb_top;
      axi_test_fail  = 1'b0;
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
      bench_csv_fd = 0;
-     $display("[TB_VERSION] MINST_LAYER_MNIST_MLP_W8_QAT_RAW_INT32_JSON_V1 | source=minst_layer/sim_tb_top.v | array=(%0d,%0d,%0d) | case0(M,K,N)=(%0d,%0d,%0d) | baked=%0d | t=%0t",
+     $display("[TB_VERSION] MNIST_LAYER_MNIST_MLP_W8_QAT_RAW_INT32_JSON_V1 | source=mnist_layer/sim_tb_top.v | array=(%0d,%0d,%0d) | case0(M,K,N)=(%0d,%0d,%0d) | baked=%0d | t=%0t",
               MATRIX_MAX_M, MATRIX_MAX_K, MATRIX_MAX_N,
               CASE0_M_DIM, CASE0_K_DIM, CASE0_N_DIM, CASE0_JSON_BAKED, $time);
      sum_fetch_cycles   = 0;
@@ -2145,23 +2145,23 @@ module sim_tb_top;
 
      if (PRINT_BENCH_RESULT_CSV != 0) begin
        if ((MATRIX_MAX_M == 4) && (MATRIX_MAX_N == 4)) begin
-         bench_csv_fd = $fopen("minst_layer_4_4_16x16x10.csv", "w");
+         bench_csv_fd = $fopen("mnist_layer_4_4_16x16x10.csv", "w");
          if (bench_csv_fd == 0)
-           $display("WARNING: could not open minst_layer_4_4_16x16x10.csv for writing");
+           $display("WARNING: could not open mnist_layer_4_4_16x16x10.csv for writing");
          else
-           $display("Writing benchmark rows to minst_layer_4_4_16x16x10.csv");
+           $display("Writing benchmark rows to mnist_layer_4_4_16x16x10.csv");
        end else if ((MATRIX_MAX_M == 8) && (MATRIX_MAX_N == 8)) begin
-         bench_csv_fd = $fopen("minst_layer_8_8_16x16x10.csv", "w");
+         bench_csv_fd = $fopen("mnist_layer_8_8_16x16x10.csv", "w");
          if (bench_csv_fd == 0)
-           $display("WARNING: could not open minst_layer_8_8_16x16x10.csv for writing");
+           $display("WARNING: could not open mnist_layer_8_8_16x16x10.csv for writing");
          else
-           $display("Writing benchmark rows to minst_layer_8_8_16x16x10.csv");
+           $display("Writing benchmark rows to mnist_layer_8_8_16x16x10.csv");
        end else begin
-         bench_csv_fd = $fopen("minst_layer_case0_16x16x10.csv", "w");
+         bench_csv_fd = $fopen("mnist_layer_case0_16x16x10.csv", "w");
          if (bench_csv_fd == 0)
-           $display("WARNING: could not open minst_layer_case0_16x16x10.csv for writing");
+           $display("WARNING: could not open mnist_layer_case0_16x16x10.csv for writing");
          else
-           $display("Writing benchmark rows to minst_layer_case0_16x16x10.csv");
+           $display("Writing benchmark rows to mnist_layer_case0_16x16x10.csv");
        end
        if (bench_csv_fd != 0) begin
          $fdisplay(bench_csv_fd,

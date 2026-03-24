@@ -25,7 +25,13 @@ benchmark/sim_build_os
 benchmark_in_vivado/benchmark_results.csv
 benchmark_in_vivado/benchmark_results.json
 benchmark_in_vivado/benchmark_results_from_log.csv
+bert_layer_case0_*.csv
+mnist_layer_case0_*.csv
 
 *.vvp
 
 *.out
+*.jou
+*.pb
+.Xil/
+xsim.dir/

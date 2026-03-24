@@ -1157,8 +1157,8 @@ function integer clogb2 (input integer size);
   wire                              matrix_dma_busy;
   reg                               matrix_done_latched;
 
-  // RSA-WS-layer-friendly default single run for Vivado example-top bring-up.
-  // The real multi-case verification is driven by rsa_ws_layer/sim_tb_top.v.
+  // BERT-layer-friendly default single run for Vivado example-top bring-up.
+  // The real multi-case verification is driven by bert_layer/sim_tb_top.v.
   localparam [31:0] MATRIX_ADDR_A = 32'd0;
   localparam [31:0] MATRIX_ADDR_B = 32'd1024;
   localparam [31:0] MATRIX_ADDR_C = 32'd2048;

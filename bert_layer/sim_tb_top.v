@@ -2102,7 +2102,7 @@ module sim_tb_top;
      axi_test_fail  = 1'b0;
      axi_test_rdata = {C_S_AXI_DATA_WIDTH{1'b0}};
      bench_csv_fd = 0;
-     $display("[TB_VERSION] RSA_WS_LAYER_JSON_V1 | source=rsa_ws_layer/sim_tb_top.v | array=(%0d,%0d,%0d) | case0(M,K,N)=(%0d,%0d,%0d) | baked=%0d | t=%0t",
+     $display("[TB_VERSION] BERT_LAYER_JSON_V1 | source=bert_layer/sim_tb_top.v | array=(%0d,%0d,%0d) | case0(M,K,N)=(%0d,%0d,%0d) | baked=%0d | t=%0t",
               MATRIX_MAX_M, MATRIX_MAX_K, MATRIX_MAX_N,
               CASE0_M_DIM, CASE0_K_DIM, CASE0_N_DIM, CASE0_JSON_BAKED, $time);
      sum_fetch_cycles   = 0;
@@ -2146,11 +2146,26 @@ module sim_tb_top;
      max_memory_stall_ratio = 0.0;
 
      if (PRINT_BENCH_RESULT_CSV != 0) begin
-       bench_csv_fd = $fopen("rsa_ws_layer_4_4_32x128x2.csv", "w");
-       if (bench_csv_fd == 0) begin
-         $display("WARNING: could not open rsa_ws_layer_4_4_32x128x2.csv for writing");
+       if ((MATRIX_MAX_M == 4) && (MATRIX_MAX_N == 4)) begin
+         bench_csv_fd = $fopen("bert_layer_4_4_32x128x2.csv", "w");
+         if (bench_csv_fd == 0)
+           $display("WARNING: could not open bert_layer_4_4_32x128x2.csv for writing");
+         else
+           $display("Writing benchmark rows to bert_layer_4_4_32x128x2.csv");
+       end else if ((MATRIX_MAX_M == 8) && (MATRIX_MAX_N == 8)) begin
+         bench_csv_fd = $fopen("bert_layer_8_8_32x128x2.csv", "w");
+         if (bench_csv_fd == 0)
+           $display("WARNING: could not open bert_layer_8_8_32x128x2.csv for writing");
+         else
+           $display("Writing benchmark rows to bert_layer_8_8_32x128x2.csv");
        end else begin
-         $display("Writing benchmark rows to rsa_ws_layer_4_4_32x128x2.csv");
+         bench_csv_fd = $fopen("bert_layer_case0_32x128x2.csv", "w");
+         if (bench_csv_fd == 0)
+           $display("WARNING: could not open bert_layer_case0_32x128x2.csv for writing");
+         else
+           $display("Writing benchmark rows to bert_layer_case0_32x128x2.csv");
+       end
+       if (bench_csv_fd != 0) begin
          $fdisplay(bench_csv_fd,
                    "status,case_id,M,K,N,preload_ps,cfg_ps,run_ps,readback_ps,useful_macs,latency_cycles,sys_busy_cycles,dma_busy_cycles,dma_busy_ratio,physical_pe_count,pe_utilization,memory_stall_cycles,memory_stall_ratio,aw_wait_cycles,w_wait_cycles,b_wait_cycles,ar_wait_cycles,r_wait_cycles,fetch_cycles,compute_cycles,writeback_cycles,move_cycles,axi_active_cycles,axi_active_ratio,throughput_mac_per_cycle,ar_requests,aw_requests,read_beats,write_beats,b_responses,a_reads,b_reads,c_reads,c_writes,read_bytes,write_bytes,mismatch_count,max_abs_error,sum_abs_error,mean_abs_error");
        end
