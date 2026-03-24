@@ -646,7 +646,10 @@ module example_top #
       
 
 
-   parameter RST_ACT_LOW           = 1
+   parameter RST_ACT_LOW           = 1,
+   parameter MATRIX_MAX_M          = 8,
+   parameter MATRIX_MAX_K          = 8,
+   parameter MATRIX_MAX_N          = 8
 
 
                                      // =1 for active low reset,
@@ -1154,17 +1157,17 @@ function integer clogb2 (input integer size);
   wire                              matrix_dma_busy;
   reg                               matrix_done_latched;
 
-  // RSA/ADAPTNET-friendly default single run for Vivado example-top bring-up.
-  // The real multi-case verification is driven by rsa_ws/sim_tb_top.v.
+  // RSA-WS-layer-friendly default single run for Vivado example-top bring-up.
+  // The real multi-case verification is driven by rsa_ws_layer/sim_tb_top.v.
   localparam [31:0] MATRIX_ADDR_A = 32'd0;
   localparam [31:0] MATRIX_ADDR_B = 32'd1024;
   localparam [31:0] MATRIX_ADDR_C = 32'd2048;
   localparam [31:0] MATRIX_M_DIM  = 32'd32;
-  localparam [31:0] MATRIX_K_DIM  = 32'd8;
-  localparam [31:0] MATRIX_N_DIM  = 32'd8;
+  localparam [31:0] MATRIX_K_DIM  = 32'd128;
+  localparam [31:0] MATRIX_N_DIM  = 32'd2;
   localparam [31:0] MATRIX_CFG_CTRL = 32'd1;
-  localparam [31:0] MATRIX_ROW_MASK = 32'h0000_00FF;
-  localparam [31:0] MATRIX_COL_MASK = 32'h0000_00FF;
+  localparam [31:0] MATRIX_ROW_MASK = (32'h1 << MATRIX_MAX_M) - 1;
+  localparam [31:0] MATRIX_COL_MASK = (32'h1 << MATRIX_MAX_N) - 1;
 
   localparam [3:0] MATRIX_CFG_IDLE     = 4'd0,
                    MATRIX_CFG_WR_A     = 4'd1,
@@ -1705,11 +1708,11 @@ function integer clogb2 (input integer size);
    end
 
    matrix_top_wrapper #(
-     .DATA_W     (8),
-     .ACC_W      (32),
-     .MAX_M      (8),
-     .MAX_K      (8),
-     .MAX_N      (8),
+      .DATA_W     (8),
+      .ACC_W      (32),
+      .MAX_M      (MATRIX_MAX_M),
+      .MAX_K      (MATRIX_MAX_K),
+      .MAX_N      (MATRIX_MAX_N),
      .SRAM_W     (32),
      .ADDR_WIDTH (32)
    ) u_matrix_top_wrapper (
