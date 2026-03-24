@@ -35,3 +35,5 @@ mnist_layer_case0_*.csv
 *.pb
 .Xil/
 xsim.dir/
+
+*.xml
