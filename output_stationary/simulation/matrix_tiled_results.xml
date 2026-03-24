@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1774280776" />
-    <testcase name="test_matrix_top_signed_regression" classname="matrix_tb" file="D:\Document\ADL_Group_11\output_stationary\simulation\matrix_tb.py" lineno="318" time="2.1870179176330566" sim_time_ns="96880.0" ratio_time="44297.76236348822" />
-  </testsuite>
-</testsuites>
