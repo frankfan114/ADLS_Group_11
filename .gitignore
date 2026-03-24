@@ -1,5 +1,7 @@
 # simulation build outputs
 weight_stationary/simulation/sim_build_matrix_wrapper/
+os_pp/simulation/sim_build_matrix_wrapper/
+ws_pp/simulation/sim_build_matrix_wrapper/
 
 # waveform files
 weight_stationary/simulation/matrix_tiled_ws_check.vvp
@@ -7,6 +9,11 @@ weight_stationary/simulation/matrix_top_wrapper_ws_check.vvp
 
 # results
 weight_stationary/simulation/matrix_wrapper_results.xml
+os_pp/simulation/matrix_wrapper_results.xml
+ws_pp/simulation/matrix_wrapper_results.xml
+ws_pp/simulation/matrix_wrapper_nopp_results.xml
+os_pp/matrix_wrapper_results.xml
+os_pp/matrix_wrapper_nopp_results.xml
 
 weight_stationary/simulation/sim_build_matrix_tiled
 # python cache
@@ -21,4 +28,4 @@ benchmark_in_vivado/benchmark_results_from_log.csv
 
 *.vvp
 
-
+*.out
