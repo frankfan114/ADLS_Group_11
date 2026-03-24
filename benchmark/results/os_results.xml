@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1773969821" />
-    <testcase name="benchmark_matrix_top_wrapper" classname="systolic_axi_benchmark_tb" file="D:\Document\ADL_Group_11\benchmark\systolic_axi_benchmark_tb.py" lineno="30" time="18.630198001861572" sim_time_ns="610060.0" ratio_time="32745.760401421467" />
-  </testsuite>
-</testsuites>
