@@ -1157,9 +1157,16 @@ function integer clogb2 (input integer size);
   localparam [31:0] MATRIX_ADDR_A = 32'd0;
   localparam [31:0] MATRIX_ADDR_B = 32'd1024;
   localparam [31:0] MATRIX_ADDR_C = 32'd2048;
-  localparam [31:0] MATRIX_M_DIM  = 32'd8;
-  localparam [31:0] MATRIX_K_DIM  = 32'd8;
-  localparam [31:0] MATRIX_N_DIM  = 32'd8;
+  localparam [31:0] MATRIX_M_DIM  = 32'd32;
+  localparam [31:0] MATRIX_K_DIM  = 32'd128;
+  localparam [31:0] MATRIX_N_DIM  = 32'd2;
+  localparam integer MATRIX_DATA_W     = 8;
+  localparam integer MATRIX_ACC_W      = 32;
+  localparam integer MATRIX_MAX_M      = 4;
+  localparam integer MATRIX_MAX_K      = 4;
+  localparam integer MATRIX_MAX_N      = 4;
+  localparam integer MATRIX_SRAM_W     = 32;
+  localparam integer MATRIX_ADDR_WIDTH = 32;
 
   localparam [3:0] MATRIX_CFG_IDLE     = 4'd0,
                    MATRIX_CFG_WR_A     = 4'd1,
@@ -1571,6 +1578,11 @@ function integer clogb2 (input integer size);
      aresetn <= ~rst;
    end
 
+   initial begin
+     $display("MATRIX_TOP_WRAPPER_CFG: DATA_W=%0d ACC_W=%0d MAX_M=%0d MAX_K=%0d MAX_N=%0d SRAM_W=%0d ADDR_WIDTH=%0d",
+              MATRIX_DATA_W, MATRIX_ACC_W, MATRIX_MAX_M, MATRIX_MAX_K, MATRIX_MAX_N, MATRIX_SRAM_W, MATRIX_ADDR_WIDTH);
+   end
+
    // Program matrix wrapper registers and start once calibration is done.
    always @(posedge clk) begin
      if (rst) begin
@@ -1675,13 +1687,13 @@ function integer clogb2 (input integer size);
    end
 
    matrix_top_wrapper #(
-     .DATA_W     (8),
-     .ACC_W      (32),
-     .MAX_M      (8),
-     .MAX_K      (8),
-     .MAX_N      (8),
-     .SRAM_W     (32),
-     .ADDR_WIDTH (32)
+     .DATA_W     (MATRIX_DATA_W),
+     .ACC_W      (MATRIX_ACC_W),
+     .MAX_M      (MATRIX_MAX_M),
+     .MAX_K      (MATRIX_MAX_K),
+     .MAX_N      (MATRIX_MAX_N),
+     .SRAM_W     (MATRIX_SRAM_W),
+     .ADDR_WIDTH (MATRIX_ADDR_WIDTH)
    ) u_matrix_top_wrapper (
      .clk          (clk),
      .resetn       (aresetn & init_calib_complete),
