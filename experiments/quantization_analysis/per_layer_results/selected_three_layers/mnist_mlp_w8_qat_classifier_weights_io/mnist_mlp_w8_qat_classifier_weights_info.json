@@ -31,14 +31,14 @@
         "weight_sparsity_zero": 0.0,
         "weight_sparsity_near_zero": 0.0,
         "activation_shape": [
-          32,
+          1,
           16,
           16
         ],
         "activation_min": 0.0,
-        "activation_max": 36.45460891723633,
-        "activation_sparsity_zero": 0.2891845703125,
-        "activation_sparsity_near_zero": 0.2891845703125,
+        "activation_max": 24.376323699951172,
+        "activation_sparsity_zero": 0.23828125,
+        "activation_sparsity_near_zero": 0.23828125,
         "sensitivity_accuracy_drop": null,
         "model_name": "MNISTStructuredMLP",
         "layer_id": "MNISTStructuredMLP#L2#fc_classify"

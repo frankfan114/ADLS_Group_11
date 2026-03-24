@@ -225,5 +225,5 @@
   "scale_bias": 0.0026270910166203976,
   "export_bit_width": 8,
   "note": "int values; to recover float: float_val = int_val * scale_*",
-  "reason": "fc_classify: 2D head (16x16) @ (16x10) -> (16x10); checkpoint mnist_mlp_w8_qat.pt; int32 IO from symmetric int8 export"
+  "reason": "fc_classify: 2D head (16x16) @ (16x10) -> (16x10); checkpoint mnist_mlp_w8_qat.pt; int1 IO from symmetric int8 export"
 }
