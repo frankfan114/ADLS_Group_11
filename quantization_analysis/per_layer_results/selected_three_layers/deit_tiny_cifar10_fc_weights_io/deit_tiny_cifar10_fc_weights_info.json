@@ -1,0 +1,43 @@
+{
+  "model": "DeiT-tiny",
+  "source_checkpoint": "deit_tiny_w8_qat.pt",
+  "config_dir": "F:\\year4\\ADLSHWCW\\ADL_Group_11\\experiments\\quantization_analysis\\checkpoints\\deit_tiny_cifar10_ft\\best_hf",
+  "dataset": "cifar10",
+  "task": "image_classification",
+  "focus": "classifier_linear_w8_qat_export",
+  "embed_dim": 192,
+  "num_classes": 10,
+  "export": {
+    "act_bit_width": 8,
+    "weight_bit_width": 8,
+    "output_bit_width": 8,
+    "gemm_includes_bias": false,
+    "json_includes_scale": false,
+    "json_includes_bias": false
+  },
+  "selected_layer": {
+    "name": "classifier",
+    "layer_id": "DeiT-tiny-CIFAR10-w8QAT#classifier",
+    "weight_shape": [
+      10,
+      192
+    ],
+    "weight_min": -0.07962526381015778,
+    "weight_max": 0.06194134056568146,
+    "weight_mean": 0.00027378788217902184,
+    "weight_std": 0.021774791181087494,
+    "classifier_input_shape": [
+      64,
+      192
+    ],
+    "classifier_input_min": -7.15033483505249,
+    "classifier_input_max": 7.041591644287109,
+    "logits_shape": [
+      64,
+      10
+    ],
+    "logits_min": -2.733081102371216,
+    "logits_max": 6.663039684295654
+  },
+  "selection_note": "export_deit_tiny_fc_from_w8_qat_checkpoint.py"
+}

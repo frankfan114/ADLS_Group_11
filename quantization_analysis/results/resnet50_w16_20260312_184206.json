@@ -1,0 +1,18 @@
+{
+  "model": "ResNet50",
+  "checkpoint": "resnet50",
+  "dataset": "cifar10",
+  "layer_types": [
+    "linear",
+    "conv2d"
+  ],
+  "bit_width": 16,
+  "frac_width": 8,
+  "scheme": "integer",
+  "baseline_accuracy": 0.6895,
+  "ptq_accuracy": 0.6895,
+  "qat_accuracy": 0.7482,
+  "train_epochs": 20,
+  "qat_epochs": 3,
+  "timestamp": "2026-03-12T18:42:06.797748"
+}

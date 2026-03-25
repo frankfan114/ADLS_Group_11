@@ -1,0 +1,48 @@
+{
+  "title": "Single layer info + exported IO (fc_classify)",
+  "layer": "fc_classify",
+  "model": "MNISTStructuredMLP",
+  "checkpoint": "F:\\year4\\ADLSHWCW\\ADL_Group_11\\experiments\\mlp_mnist\\mnist_mlp_w8_qat.pt",
+  "layout": {
+    "weight_logical": "16x10 outputs x 16x16 inputs",
+    "weight_shape_pytorch": [
+      16,
+      10
+    ]
+  },
+  "layers": [
+    {
+      "profile_source": "mnist_mlp_w8_qat.pt",
+      "checkpoint": "mnist_mlp_w8_qat.pt",
+      "layer_name": "fc_classify",
+      "rank_note": "Final classifier before reshape (N,16,10) and mean over 16 -> 10 logits.",
+      "profile_layer": {
+        "layer_index": 2,
+        "name": "fc_classify",
+        "graph_node_name": "fc_classify",
+        "weight_shape": [
+          16,
+          10
+        ],
+        "weight_min": -0.5452036261558533,
+        "weight_max": 0.42884039878845215,
+        "weight_mean": 0.005423668771982193,
+        "weight_std": 0.24519799649715424,
+        "weight_sparsity_zero": 0.0,
+        "weight_sparsity_near_zero": 0.0,
+        "activation_shape": [
+          1,
+          16,
+          16
+        ],
+        "activation_min": 0.0,
+        "activation_max": 24.376323699951172,
+        "activation_sparsity_zero": 0.23828125,
+        "activation_sparsity_near_zero": 0.23828125,
+        "sensitivity_accuracy_drop": null,
+        "model_name": "MNISTStructuredMLP",
+        "layer_id": "MNISTStructuredMLP#L2#fc_classify"
+      }
+    }
+  ]
+}

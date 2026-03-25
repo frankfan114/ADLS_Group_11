@@ -1,0 +1,1013 @@
+{
+  "model": "ResNet18",
+  "dataset": "cifar10",
+  "focus": "conv2d",
+  "total_conv_layers": 20,
+  "quantized": false,
+  "checkpoint": "checkpoints\\ResNet18_trained.pt",
+  "calibration_batches": 8,
+  "conv_layers": [
+    {
+      "layer_index": 0,
+      "name": "conv1",
+      "graph_node_name": "conv1",
+      "weight_shape": [
+        64,
+        3,
+        7,
+        7
+      ],
+      "in_channels": 3,
+      "out_channels": 64,
+      "kernel_size": [
+        7,
+        7
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        3,
+        3
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.45521703362464905,
+      "weight_max": 0.544451117515564,
+      "weight_mean": -0.0013683493016287684,
+      "weight_std": 0.10853750258684158,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        64,
+        16,
+        16
+      ],
+      "activation_min": -23.75250244140625,
+      "activation_max": 23.52174949645996,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 1.1920928955078125e-06,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C0#conv1"
+    },
+    {
+      "layer_index": 1,
+      "name": "layer1.0.conv1",
+      "graph_node_name": "layer1_0_conv1",
+      "weight_shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "in_channels": 64,
+      "out_channels": 64,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -1.1822839975357056,
+      "weight_max": 0.44026586413383484,
+      "weight_mean": -0.006775225978344679,
+      "weight_std": 0.1265733540058136,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        64,
+        8,
+        8
+      ],
+      "activation_min": -66.2494125366211,
+      "activation_max": 38.715248107910156,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C1#layer1.0.conv1"
+    },
+    {
+      "layer_index": 2,
+      "name": "layer1.0.conv2",
+      "graph_node_name": "layer1_0_conv2",
+      "weight_shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "in_channels": 64,
+      "out_channels": 64,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5290317535400391,
+      "weight_max": 0.5705196857452393,
+      "weight_mean": -0.007836391218006611,
+      "weight_std": 0.1250651627779007,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 2.712673611111111e-05,
+      "activation_shape": [
+        64,
+        64,
+        8,
+        8
+      ],
+      "activation_min": -26.969467163085938,
+      "activation_max": 32.978878021240234,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C2#layer1.0.conv2"
+    },
+    {
+      "layer_index": 3,
+      "name": "layer1.1.conv1",
+      "graph_node_name": "layer1_1_conv1",
+      "weight_shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "in_channels": 64,
+      "out_channels": 64,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.548921525478363,
+      "weight_max": 0.4643808603286743,
+      "weight_mean": -0.010557442903518677,
+      "weight_std": 0.126316100358963,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 2.712673611111111e-05,
+      "activation_shape": [
+        64,
+        64,
+        8,
+        8
+      ],
+      "activation_min": -75.00331115722656,
+      "activation_max": 49.35569763183594,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C3#layer1.1.conv1"
+    },
+    {
+      "layer_index": 4,
+      "name": "layer1.1.conv2",
+      "graph_node_name": "layer1_1_conv2",
+      "weight_shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "in_channels": 64,
+      "out_channels": 64,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5396809577941895,
+      "weight_max": 0.5326005816459656,
+      "weight_mean": -0.006084618624299765,
+      "weight_std": 0.12547220289707184,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        64,
+        8,
+        8
+      ],
+      "activation_min": -21.2197265625,
+      "activation_max": 18.507781982421875,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C4#layer1.1.conv2"
+    },
+    {
+      "layer_index": 5,
+      "name": "layer2.0.conv1",
+      "graph_node_name": "layer2_0_conv1",
+      "weight_shape": [
+        128,
+        64,
+        3,
+        3
+      ],
+      "in_channels": 64,
+      "out_channels": 128,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5341863632202148,
+      "weight_max": 0.5911738276481628,
+      "weight_mean": -0.004078243393450975,
+      "weight_std": 0.11718134582042694,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 2.712673611111111e-05,
+      "activation_shape": [
+        64,
+        128,
+        4,
+        4
+      ],
+      "activation_min": -67.3757553100586,
+      "activation_max": 60.32477951049805,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C5#layer2.0.conv1"
+    },
+    {
+      "layer_index": 6,
+      "name": "layer2.0.conv2",
+      "graph_node_name": "layer2_0_conv2",
+      "weight_shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "in_channels": 128,
+      "out_channels": 128,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5740152597427368,
+      "weight_max": 0.5135517120361328,
+      "weight_mean": -0.006586729548871517,
+      "weight_std": 0.1175934374332428,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        128,
+        4,
+        4
+      ],
+      "activation_min": -27.9454288482666,
+      "activation_max": 22.624727249145508,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C6#layer2.0.conv2"
+    },
+    {
+      "layer_index": 7,
+      "name": "layer2.0.downsample.0",
+      "graph_node_name": "layer2_0_downsample_0",
+      "weight_shape": [
+        128,
+        64,
+        1,
+        1
+      ],
+      "in_channels": 64,
+      "out_channels": 128,
+      "kernel_size": [
+        1,
+        1
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        0,
+        0
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5951122045516968,
+      "weight_max": 0.6607325673103333,
+      "weight_mean": -0.006765127182006836,
+      "weight_std": 0.17236053943634033,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        128,
+        4,
+        4
+      ],
+      "activation_min": -18.926040649414062,
+      "activation_max": 22.32098388671875,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 9.5367431640625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C7#layer2.0.downsample.0"
+    },
+    {
+      "layer_index": 8,
+      "name": "layer2.1.conv1",
+      "graph_node_name": "layer2_1_conv1",
+      "weight_shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "in_channels": 128,
+      "out_channels": 128,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.4971681237220764,
+      "weight_max": 0.5394794940948486,
+      "weight_mean": -0.007872099988162518,
+      "weight_std": 0.11683004349470139,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        128,
+        4,
+        4
+      ],
+      "activation_min": -51.120567321777344,
+      "activation_max": 39.43593215942383,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C8#layer2.1.conv1"
+    },
+    {
+      "layer_index": 9,
+      "name": "layer2.1.conv2",
+      "graph_node_name": "layer2_1_conv2",
+      "weight_shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "in_channels": 128,
+      "out_channels": 128,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.4978424310684204,
+      "weight_max": 0.5405199527740479,
+      "weight_mean": -0.010394438169896603,
+      "weight_std": 0.11417586356401443,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 1.3563368055555555e-05,
+      "activation_shape": [
+        64,
+        128,
+        4,
+        4
+      ],
+      "activation_min": -25.401264190673828,
+      "activation_max": 24.40077018737793,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 9.5367431640625e-07,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C9#layer2.1.conv2"
+    },
+    {
+      "layer_index": 10,
+      "name": "layer3.0.conv1",
+      "graph_node_name": "layer3_0_conv1",
+      "weight_shape": [
+        256,
+        128,
+        3,
+        3
+      ],
+      "in_channels": 128,
+      "out_channels": 256,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5139134526252747,
+      "weight_max": 0.5268123149871826,
+      "weight_mean": -0.0013487284304574132,
+      "weight_std": 0.10887186229228973,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 6.781684027777777e-06,
+      "activation_shape": [
+        64,
+        256,
+        2,
+        2
+      ],
+      "activation_min": -64.32072448730469,
+      "activation_max": 63.80772018432617,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C10#layer3.0.conv1"
+    },
+    {
+      "layer_index": 11,
+      "name": "layer3.0.conv2",
+      "graph_node_name": "layer3_0_conv2",
+      "weight_shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "in_channels": 256,
+      "out_channels": 256,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5636026859283447,
+      "weight_max": 0.502537190914154,
+      "weight_mean": -0.004581814166158438,
+      "weight_std": 0.09163118898868561,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 8.477105034722223e-06,
+      "activation_shape": [
+        64,
+        256,
+        2,
+        2
+      ],
+      "activation_min": -69.17867279052734,
+      "activation_max": 70.18413543701172,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C11#layer3.0.conv2"
+    },
+    {
+      "layer_index": 12,
+      "name": "layer3.0.downsample.0",
+      "graph_node_name": "layer3_0_downsample_0",
+      "weight_shape": [
+        256,
+        128,
+        1,
+        1
+      ],
+      "in_channels": 128,
+      "out_channels": 256,
+      "kernel_size": [
+        1,
+        1
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        0,
+        0
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.575281023979187,
+      "weight_max": 0.5625073313713074,
+      "weight_mean": -0.007732377853244543,
+      "weight_std": 0.1395615041255951,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 0.0,
+      "activation_shape": [
+        64,
+        256,
+        2,
+        2
+      ],
+      "activation_min": -24.759929656982422,
+      "activation_max": 19.53489875793457,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C12#layer3.0.downsample.0"
+    },
+    {
+      "layer_index": 13,
+      "name": "layer3.1.conv1",
+      "graph_node_name": "layer3_1_conv1",
+      "weight_shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "in_channels": 256,
+      "out_channels": 256,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5044955015182495,
+      "weight_max": 0.5863954424858093,
+      "weight_mean": -0.016455987468361855,
+      "weight_std": 0.07205407321453094,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 2.0345052083333332e-05,
+      "activation_shape": [
+        64,
+        256,
+        2,
+        2
+      ],
+      "activation_min": -130.6908416748047,
+      "activation_max": 192.0698699951172,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C13#layer3.1.conv1"
+    },
+    {
+      "layer_index": 14,
+      "name": "layer3.1.conv2",
+      "graph_node_name": "layer3_1_conv2",
+      "weight_shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "in_channels": 256,
+      "out_channels": 256,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.49879738688468933,
+      "weight_max": 1.245127558708191,
+      "weight_mean": -0.004704482387751341,
+      "weight_std": 0.0783371776342392,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 2.3735894097222223e-05,
+      "activation_shape": [
+        64,
+        256,
+        2,
+        2
+      ],
+      "activation_min": -150.16152954101562,
+      "activation_max": 339.7688293457031,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C14#layer3.1.conv2"
+    },
+    {
+      "layer_index": 15,
+      "name": "layer4.0.conv1",
+      "graph_node_name": "layer4_0_conv1",
+      "weight_shape": [
+        512,
+        256,
+        3,
+        3
+      ],
+      "in_channels": 256,
+      "out_channels": 512,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.45952728390693665,
+      "weight_max": 0.8437179923057556,
+      "weight_mean": 0.001363349612802267,
+      "weight_std": 0.0583401620388031,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 3.6451551649305555e-05,
+      "activation_shape": [
+        64,
+        512,
+        1,
+        1
+      ],
+      "activation_min": -176.67225646972656,
+      "activation_max": 235.5585174560547,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C15#layer4.0.conv1"
+    },
+    {
+      "layer_index": 16,
+      "name": "layer4.0.conv2",
+      "graph_node_name": "layer4_0_conv2",
+      "weight_shape": [
+        512,
+        512,
+        3,
+        3
+      ],
+      "in_channels": 512,
+      "out_channels": 512,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.4681454300880432,
+      "weight_max": 0.5211989283561707,
+      "weight_mean": -0.0002157343551516533,
+      "weight_std": 0.03506850823760033,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 3.729926215277778e-05,
+      "activation_shape": [
+        64,
+        512,
+        1,
+        1
+      ],
+      "activation_min": -297.1961364746094,
+      "activation_max": 274.0419616699219,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C16#layer4.0.conv2"
+    },
+    {
+      "layer_index": 17,
+      "name": "layer4.0.downsample.0",
+      "graph_node_name": "layer4_0_downsample_0",
+      "weight_shape": [
+        512,
+        256,
+        1,
+        1
+      ],
+      "in_channels": 256,
+      "out_channels": 512,
+      "kernel_size": [
+        1,
+        1
+      ],
+      "stride": [
+        2,
+        2
+      ],
+      "padding": [
+        0,
+        0
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.5342171788215637,
+      "weight_max": 0.607326328754425,
+      "weight_mean": 0.006411370821297169,
+      "weight_std": 0.11103225499391556,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 7.62939453125e-06,
+      "activation_shape": [
+        64,
+        512,
+        1,
+        1
+      ],
+      "activation_min": -62.75941467285156,
+      "activation_max": 77.62470245361328,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C17#layer4.0.downsample.0"
+    },
+    {
+      "layer_index": 18,
+      "name": "layer4.1.conv1",
+      "graph_node_name": "layer4_1_conv1",
+      "weight_shape": [
+        512,
+        512,
+        3,
+        3
+      ],
+      "in_channels": 512,
+      "out_channels": 512,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.4916955530643463,
+      "weight_max": 0.3514214754104614,
+      "weight_mean": 0.0008364795939996839,
+      "weight_std": 0.028601009398698807,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 3.6875406901041664e-05,
+      "activation_shape": [
+        64,
+        512,
+        1,
+        1
+      ],
+      "activation_min": -162.02639770507812,
+      "activation_max": 139.95774841308594,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 0.0,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C18#layer4.1.conv1"
+    },
+    {
+      "layer_index": 19,
+      "name": "layer4.1.conv2",
+      "graph_node_name": "layer4_1_conv2",
+      "weight_shape": [
+        512,
+        512,
+        3,
+        3
+      ],
+      "in_channels": 512,
+      "out_channels": 512,
+      "kernel_size": [
+        3,
+        3
+      ],
+      "stride": [
+        1,
+        1
+      ],
+      "padding": [
+        1,
+        1
+      ],
+      "dilation": [
+        1,
+        1
+      ],
+      "groups": 1,
+      "has_bias": false,
+      "weight_min": -0.3667527735233307,
+      "weight_max": 0.29551687836647034,
+      "weight_mean": -0.0005946507444605231,
+      "weight_std": 0.02865217812359333,
+      "weight_sparsity_zero": 0.0,
+      "weight_sparsity_near_zero": 3.1789143880208336e-05,
+      "activation_shape": [
+        64,
+        512,
+        1,
+        1
+      ],
+      "activation_min": -332.86663818359375,
+      "activation_max": 268.7831726074219,
+      "activation_sparsity_zero": 0.0,
+      "activation_sparsity_near_zero": 2.288818359375e-05,
+      "sensitivity_accuracy_drop": null,
+      "model_name": "ResNet18",
+      "layer_id": "ResNet18#C19#layer4.1.conv2"
+    }
+  ],
+  "schema_note": "per_layer_profile. activation_min/max/shape/sparsity null when calibration_batches=0. Vision-only; NLP models have no Conv2d in this pipeline.",
+  "activation_near_zero_threshold": 1e-06
+}

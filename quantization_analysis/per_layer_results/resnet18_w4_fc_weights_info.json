@@ -1,0 +1,37 @@
+{
+  "model": "ResNet18",
+  "dataset": "cifar10",
+  "focus": "linear",
+  "total_linear_layers": 1,
+  "quantized": true,
+  "bit_width": 4,
+  "variant": "qat",
+  "checkpoint": "ResNet18_w4_qat.pt",
+  "selected_layer": {
+    "layer_index": 0,
+    "name": "fc",
+    "graph_node_name": "fc",
+    "weight_shape": [
+      10,
+      512
+    ],
+    "weight_min": -0.5046659111976624,
+    "weight_max": 0.41552627086639404,
+    "weight_mean": -0.02701299451291561,
+    "weight_std": 0.08574013411998749,
+    "weight_sparsity_zero": 0.0,
+    "weight_sparsity_near_zero": 0.0001953125,
+    "activation_shape": [
+      64,
+      10
+    ],
+    "activation_min": -14.896393775939941,
+    "activation_max": 13.042159080505371,
+    "activation_sparsity_zero": 0.0,
+    "activation_sparsity_near_zero": 0.0,
+    "sensitivity_accuracy_drop": null,
+    "model_name": "ResNet18",
+    "layer_id": "ResNet18#L0#fc"
+  },
+  "selection_note": "Single FC layer used by resnet18_w4_fc_weights_io export"
+}

@@ -1,0 +1,39 @@
+{
+  "title": "Single layer info + exported IO",
+  "layer": "classifier",
+  "model": "BERT-tiny",
+  "layers": [
+    {
+      "profile_source": "bert_tiny_w4_qat_linear_per_layer.json",
+      "checkpoint": "BERT_tiny_w4_qat.pt",
+      "layer_name": "classifier",
+      "rank_note": "User-selected layer (same model/layer as w32 classifier, replaced by w4).",
+      "profile_layer": {
+        "layer_index": 16,
+        "name": "classifier",
+        "graph_node_name": "classifier",
+        "weight_shape": [
+          2,
+          128
+        ],
+        "weight_min": -0.08647887408733368,
+        "weight_max": 0.09413550794124603,
+        "weight_mean": -0.00021828024182468653,
+        "weight_std": 0.035095907747745514,
+        "weight_sparsity_zero": 0.0,
+        "weight_sparsity_near_zero": 0.0,
+        "activation_shape": [
+          32,
+          2
+        ],
+        "activation_min": -2.766570806503296,
+        "activation_max": 2.816279649734497,
+        "activation_sparsity_zero": 0.0,
+        "activation_sparsity_near_zero": 0.0,
+        "sensitivity_accuracy_drop": null,
+        "model_name": "BERT-tiny",
+        "layer_id": "BERT-tiny#L16#classifier"
+      }
+    }
+  ]
+}
