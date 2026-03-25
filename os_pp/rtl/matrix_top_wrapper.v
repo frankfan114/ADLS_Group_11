@@ -366,6 +366,4 @@ module matrix_top_wrapper #(
     );
 `endif
 
-
-
 endmodule

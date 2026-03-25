@@ -93,8 +93,8 @@ module matrix_tiled_nopp #(
     logic [ADDR_WIDTH-1:0] base_addr_B_tile_r;
     logic [ADDR_WIDTH-1:0] base_addr_C_tile_r;
 
-    // 控制：本次 TS_INIT_TILE 是否要保留 accumulator（用于 K-continue）
-    logic init_keep_accum; // 1 => TS_INIT_TILE 不清 accum
+    // Controls whether this TS_INIT_TILE entry should preserve the accumulator for K-continue.
+    logic init_keep_accum; // 1 => do not clear accum in TS_INIT_TILE
 
     // latch keep flag on transition into TS_INIT_TILE from TS_ACCUM (k-continue)
     always_ff @(posedge clk or negedge rst_n) begin
@@ -378,7 +378,8 @@ module matrix_tiled_nopp #(
     assign busy = (t_state != TS_IDLE) && (t_state != TS_DONE);
     assign done = (t_state == TS_DONE);
 
-    // -------- memory arbitration (unchanged per your request) --------
+    // -------- memory arbitration --------
+
     always_comb begin
         mem_valid = 1'b0;
         mem_addr  = 32'h0;
@@ -404,6 +405,5 @@ module matrix_tiled_nopp #(
             wb_ready  = mem_ready;
         end
     end
-
 
 endmodule

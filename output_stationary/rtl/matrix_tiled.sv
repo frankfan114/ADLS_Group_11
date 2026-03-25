@@ -377,7 +377,7 @@ module matrix_tiled #(
     assign busy = (t_state != TS_IDLE) && (t_state != TS_DONE);
     assign done = (t_state == TS_DONE);
 
-    // -------- memory arbitration (unchanged per your request) --------
+    // -------- memory arbitration --------
     always_comb begin
         mem_valid = 1'b0;
         mem_addr  = 32'h0;
@@ -403,6 +403,5 @@ module matrix_tiled #(
             wb_ready  = mem_ready;
         end
     end
-
 
 endmodule

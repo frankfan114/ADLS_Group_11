@@ -190,4 +190,3 @@ module matrix_axi_master_bridge_split #(
     assign busy = (r_state != R_IDLE) || (w_state != W_IDLE);
 
 endmodule
-
