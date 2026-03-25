@@ -1,0 +1,27 @@
+========================================================
+  Selector RTL Config — Rank #1
+========================================================
+  Query layer          : M=64  K=192  N=10
+  Variant              : WS
+  Array dim (MAX_M/K/N): 16
+  Final score          : 0.6898
+  Perf  score          : 0.8550
+  Resource score       : 0.5246
+--------------------------------------------------------
+  Predicted performance metrics
+    latency_cycles       : 153414.3316819165
+    throughput_mac/cycle : 0.8010
+    memory_stall_ratio   : 0.7434
+    pe_utilization       : 0.0046
+--------------------------------------------------------
+  Predicted resource metrics
+    physical_pe_count    : 64.0
+    read_bytes           : 16015.63070974977
+    b_reads              : 105.17051344010655
+========================================================
+
+  RTL parameters patched in matrix_top_wrapper.v:
+    MAX_M = 16
+    MAX_K = 16
+    MAX_N = 16
+========================================================
