@@ -1,0 +1,131 @@
+══════════════════════════════════════════════════════════════════════
+  SYSTOLIC ARRAY VARIANT SELECTION REPORT
+══════════════════════════════════════════════════════════════════════
+
+  Query layer   M=64  K=192  N=10
+  Candidates    11 evaluated   │   showing top 2
+
+──────────────────────────────────────────────────────────────────────
+  TOP-K RECOMMENDATIONS
+──────────────────────────────────────────────────────────────────────
+
+    #1  Weight Stationary   [16×16 tiles]
+······································································
+    Score          1.0000  (normalised across all candidates)
+    Perf score     0.8550  │  Resource score  0.5246
+
+    ── Performance ──────────────────────────────
+    Latency        153414 cycles
+    Throughput     0.8010 MAC/cycle
+    Stall Ratio    74.3%
+
+    ── Resource ─────────────────────────────────
+    Active PEs     64  (hardware area proxy)
+    Read Bytes     16016  (memory bandwidth)
+    B-reloads      105  (weight reload count)
+
+    ── Efficiency ───────────────────────────────
+    PE Utilisation 0.46%  (useful MACs / active PE-cycles)
+
+    ── Pipeline breakdown ───────────────────────
+    fetch       132780 cycles
+    compute     390 cycles
+    writeback   736 cycles
+
+    Reference   nearest=bert  dist=0.746  (2 ref point(s) used)
+
+    #2  Output Stationary   [16×16 tiles]
+······································································
+    Score          0.9535  (normalised across all candidates)
+    Perf score     0.8274  │  Resource score  0.4898
+
+    ── Performance ──────────────────────────────
+    Latency        162929 cycles
+    Throughput     0.7542 MAC/cycle
+    Stall Ratio    74.2%
+
+    ── Resource ─────────────────────────────────
+    Active PEs     64  (hardware area proxy)
+    Read Bytes     17113  (memory bandwidth)
+    B-reloads      197  (weight reload count)
+
+    ── Efficiency ───────────────────────────────
+    PE Utilisation 0.44%  (useful MACs / active PE-cycles)
+
+    ── Pipeline breakdown ───────────────────────
+    fetch       142226 cycles
+    compute     412 cycles
+    writeback   736 cycles
+
+    Reference   nearest=bert  dist=0.746  (2 ref point(s) used)
+
+──────────────────────────────────────────────────────────────────────
+  TOP-2 TRADE-OFF COMPARISON  (relative to #1)
+──────────────────────────────────────────────────────────────────────
+
+    Metric                 #1 (baseline)       #2              
+    ──────────────────────────────────────────────────────────
+    Latency (cycles)       153414              162929 (+6.2%) ✗ 
+    Throughput (MAC/c)     0.8010              0.7542 (-5.8%) ✗ 
+    Active PEs             64                  64 (0.0%) ✗ 
+    Read Bytes             16016               17113 (+6.9%) ✗ 
+    Stall Ratio            0.7434              0.7420 (-0.2%) ✓ 
+    PE Utilisation         0.0046              0.0044 (-5.1%) ✗ 
+    B-reloads              105                 197 (+87.0%) ✗ 
+
+    ✓ = better than #1   ✗ = worse than #1
+
+──────────────────────────────────────────────────────────────────────
+  FULL TRADE-OFF TABLE  (all candidates, sorted by score)
+──────────────────────────────────────────────────────────────────────
+
+    Rank  Variant                          Dim    Score     Perf   Rsrc   Latency   MAC/c  PEs   ReadB  Stall%
+    ────────────────────────────────────────────────────────────────────────────────
+    1     Weight Stationary                16×16  1.0000   0.855  0.525    153414  0.8010   64   16016    74.3 ◄
+    2     Output Stationary                16×16  0.9535   0.827  0.490    162929  0.7542   64   17113    74.2 ◄
+    3     Reconfigurable WS (SARA)         4×4    0.8864   0.507  0.861    425169  0.2890   16   42787    68.6
+    4     Reconfigurable WS (SARA)         8×8    0.7216   0.602  0.448    275881  0.4454   64   29401    73.2
+    5     Weight Stationary                8×8    0.6649   0.554  0.427    298692  0.4114   64   32031    73.6
+    6     Weight Stationary + Ping-Pong    4×4    0.5573   0.473  0.372    430129  0.2857   64   42787    69.7
+    7     Output Stationary                8×8    0.5108   0.465  0.307    356865  0.3443   64   38617    73.8
+    8     Output Stationary + Ping-Pong    8×8    0.4625   0.412  0.308    345102  0.3561   64   38617    76.5
+    9     Weight Stationary                4×4    0.4611   0.405  0.316    494791  0.2483   64   50677    69.4
+    10    Output Stationary                4×4    0.0239   0.138  0.000    701704  0.1751   64   73728    71.1
+    11    Output Stationary + Ping-Pong    4×4    0.0000   0.112  0.000    687211  0.1788   64   73728    72.7
+
+──────────────────────────────────────────────────────────────────────
+  PARETO FRONT  (minimising latency AND read_bytes simultaneously)
+──────────────────────────────────────────────────────────────────────
+
+    1 Pareto-optimal configuration(s):
+
+    ●  Weight Stationary  [16×16]
+       latency=153414 cycles   read=16016 bytes   throughput=0.8010 MAC/cycle
+
+──────────────────────────────────────────────────────────────────────
+  CONFIDENCE
+──────────────────────────────────────────────────────────────────────
+
+    Overall   [████████████░░░░░░░░]  0.58
+    Level     MEDIUM ⚠
+
+    confidence  =  0.65 × pred_quality  +  0.35 × rank_stability
+                =  0.65 × 0.496  +  0.35 × 0.724
+                =  0.5756
+
+    pred_quality   0.496   exp(−d/2.0) × coverage
+      d_nearest    0.746   distance to closest reference layer
+      coverage     0.720   0.65 + 0.35 × weighted in-range  (K=0.5, M=0.3, N=0.2)
+
+    rank_stability 0.724   how clearly top-K beats the rest
+      score_gap    0.067   normalised gap between #2 and #3
+      (gap ≥ 0.15 = clear separation → rank_stability = 1.0)
+
+    Reference layers in dataset:
+      • mnist  M=16  K=16   N=10  (Linear)
+      • bert   M=32  K=128  N=2   (Linear)
+
+    Predictions use physics-scaled IDW for b_reads, latency,
+    fetch_cycles, read_bytes — plain IDW for remaining metrics.
+
+══════════════════════════════════════════════════════════════════════
