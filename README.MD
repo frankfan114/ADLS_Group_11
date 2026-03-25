@@ -1,4 +1,4 @@
-# ADLS Group 11
+# ADLS Group 11 -- Design Space Exploration and Layer-Aware Mapping for Systolic Array Variants
 
 ## Project Overview
 
@@ -61,3 +61,17 @@ Hardware performance for NN inference is highly sensitive to **dataflow and memo
 | [`vivado_simulation/`](vivado_simulation/)         | Vivado-compatible simulation files for the systolic array designs and neural network layer demos (BERT, DeiT, MNIST). Each subdirectory has a top-level wrapper, a testbench, and hex weight/data init files.      |
 | [`quantization_analysis/`](quantization_analysis/) | PyTorch PTQ/QAT sweep, per-layer profiling, and weight export scripts. Covers ResNet18/50 and BERT-tiny; outputs sweep metrics, checkpoints, and per-layer JSON profiles.                                          |
 | [`selector/`](selector/)                           | Automated systolic array selector and RTL generator. Given a workload shape, `systolic_selector/` ranks designs using benchmark CSVs, generates RTL, and produces comparison reports.                              |
+
+---
+
+## Branches
+
+Development was split across several branches, each focused on a specific aspect of the project:
+
+| Branch                       | Purpose                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
+| `main`                       | Consolidated final state — RTL, verification, simulation, quantization, and selector |
+| `variant`                    | Exploration of systolic array variants experiments                                   |
+| `pingpong`                   | Ping-pong buffering extension for WS and OS designs                                  |
+| `layer_info`                 | Per-layer analysis results and selected layer weight bundles                         |
+| `result` / `result+selector` | Benchmark results, resource utilization data, and selector integration               |
