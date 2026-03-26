@@ -7,6 +7,6 @@ TOPLEVEL ?= matrix_top_wrapper
 MODULE   ?= matrix_axi_wrapper_tb
 
 # Compile only matrix-related RTL for faster and cleaner sims.
-RTL_DIR := $(CURDIR)/../rtl
+RTL_DIR := $(CURDIR)/../../rtl/output_stationary
 VERILOG_SOURCES := $(shell find $(RTL_DIR) -type f \( -name "*.v" -o -name "*.sv" \) | sort)
 include $(shell cocotb-config --makefiles)/Makefile.sim

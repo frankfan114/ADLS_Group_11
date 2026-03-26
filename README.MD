@@ -1,5 +1,19 @@
 # ADLS Group 11: Design Space Exploration and Layer-Aware Mapping for Systolic Array Variants
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Key Contributions](#key-contributions)
+- [Key Findings](#key-findings)
+- [Repository Structure](#repository-structure)
+- [Running the Tools](#running-the-tools)
+  - [Selector](#selector)
+  - [CocoTB Functional Verification](#cocotb-functional-verification)
+  - [Vivado Simulation](#vivado-simulation)
+- [Branches](#branches)
+
+---
+
 ## Project Overview
 
 This project explores how different **systolic-array architectures** impact the performance of **quantized neural network (NN) inference**, and introduces an automated toolflow for **layer-aware hardware mapping**.
@@ -10,6 +24,8 @@ We design and evaluate multiple systolic-array variants—including **Output-Sta
 - Processing element (PE) utilization
 - Stall behavior (memory bottlenecks)
 - Hardware cost (LUTs, FFs, etc.)
+
+---
 
 ## Key Contributions
 
@@ -39,6 +55,8 @@ We design and evaluate multiple systolic-array variants—including **Output-Sta
   - Generates the corresponding RTL configuration
 - Avoids exhaustive search while still achieving effective design selection
 
+---
+
 ## Key Findings
 
 - **Weight-Stationary (WS)** consistently outperforms OS for reuse-heavy workloads due to reduced weight movement
@@ -46,32 +64,104 @@ We design and evaluate multiple systolic-array variants—including **Output-Sta
 - **Reconfigurability** improves utilization but does not eliminate memory bottlenecks
 - Overall performance is often **memory-bound**, not compute-bound
 
-## Takeaway
-
-Hardware performance for NN inference is highly sensitive to **dataflow and memory behavior**. A **multi-architecture design space** combined with **benchmark-driven selection** is more effective than relying on a single fixed accelerator, and lightweight automated mapping can bridge the gap between **hardware specialization** and **workload diversity**.
+**Takeaway:** Hardware performance for NN inference is highly sensitive to dataflow and memory behavior. A multi-architecture design space combined with benchmark-driven selection is more effective than relying on a single fixed accelerator.
 
 ---
 
 ## Repository Structure
 
-| Folder                                             | Contents                                                                                                                                                                                                           |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`rtl/`](rtl/)                                     | SystemVerilog/Verilog RTL source for six systolic array designs (`output_stationary`, `weight_stationary`, `os_pp`, `ws_pp`, `rsa_ws`, `smt_sa`). Each design shares the `matrix_top_wrapper` top-level interface. |
-| [`cocotb_verification/`](cocotb_verification/)     | Python-based cocotb functional verification testbenches for each RTL design. Each subdirectory contains a testbench (`matrix_axi_wrapper_tb.py`), a `Makefile`, and a `TEST_CASES.md`.                             |
-| [`vivado_simulation/`](vivado_simulation/)         | Vivado-compatible simulation files for the systolic array designs and neural network layer demos (BERT, DeiT, MNIST). Each subdirectory has a top-level wrapper, a testbench, and hex weight/data init files.      |
-| [`quantization_analysis/`](quantization_analysis/) | PyTorch PTQ/QAT sweep, per-layer profiling, and weight export scripts. Covers ResNet18/50 and BERT-tiny; outputs sweep metrics, checkpoints, and per-layer JSON profiles.                                          |
-| [`selector/`](selector/)                           | Automated systolic array selector and RTL generator. Given a workload shape, `systolic_selector/` ranks designs using benchmark CSVs, generates RTL, and produces comparison reports.                              |
+| Folder | Contents |
+|--------|----------|
+| [`rtl/`](rtl/) | SystemVerilog/Verilog RTL source for six systolic array designs (`output_stationary`, `weight_stationary`, `os_pp`, `ws_pp`, `rsa_ws`, `smt_sa`). Each design shares the `matrix_top_wrapper` top-level interface. |
+| [`cocotb_verification/`](cocotb_verification/) | Python-based cocotb functional verification testbenches for each RTL design. Each subdirectory contains a testbench (`matrix_axi_wrapper_tb.py`), a `Makefile`, and a `TEST_CASES.md`. |
+| [`vivado_simulation/`](vivado_simulation/) | Vivado-compatible simulation files for the systolic array designs and neural network layer demos (BERT, DeiT, MNIST). Each subdirectory has a top-level wrapper, a testbench, and hex weight/data init files. |
+| [`quantization_analysis/`](quantization_analysis/) | PyTorch PTQ/QAT sweep, per-layer profiling, and weight export scripts. Covers ResNet18/50 and BERT-tiny; outputs sweep metrics, checkpoints, and per-layer JSON profiles. |
+| [`selector/`](selector/) | Automated systolic array selector and RTL generator. Given a workload shape, `systolic_selector/` ranks designs using benchmark CSVs, generates RTL, and produces comparison reports. |
+
+---
+
+## Running the Tools
+
+### Selector
+
+The selector ranks systolic array variants for a given layer shape and optionally generates patched RTL. See [`selector/README.md`](selector/README.md) for full documentation.
+
+```bash
+cd selector/systolic_selector
+
+# BERT-tiny layer
+python main.py --M 32 --K 128 --N 2
+
+# MNIST MLP layer
+python main.py --M 16 --K 16 --N 10
+
+# Custom layer — latency-first priority, top-5 results
+python main.py --M 64 --K 192 --N 10 --perf_w 0.8 --resource_w 0.2 --top_k 5
+```
+
+Reports and generated RTL are written to `selector/reports/`:
+
+| Output | Path |
+|--------|------|
+| Markdown report | `reports/report_M{M}_K{K}_N{N}.md` |
+| Plain-text report | `reports/report_M{M}_K{K}_N{N}.txt` |
+| Trade-off scatter plot | `reports/plot_M{M}_K{K}_N{N}.png` |
+| Generated RTL | `reports/generated_rtl/rank{i}_{VARIANT}_dim{D}/` |
+
+---
+
+### CocoTB Functional Verification
+
+Requires [cocotb](https://github.com/cocotb/cocotb) and [Icarus Verilog](http://iverilog.icarus.com/).
+
+```bash
+cd cocotb_verification/<design>/
+PYTHONHOME=<path-to-python> make
+```
+
+> **Windows note:** `vvp` (Icarus Verilog's runtime) cannot locate the Python standard library unless `PYTHONHOME` is set explicitly. Find your path with `python -c "import sys; print(sys.prefix)"`.
+
+Available designs: `output_stationary`, `weight_stationary`, `os_pp`, `ws_pp`, `rsa_ws`, `smt_sa`
+
+Example:
+
+```bash
+cd cocotb_verification/weight_stationary/
+PYTHONHOME="C:/Users/<username>/AppData/Local/Programs/Python/Python311" make
+```
+
+---
+
+### Vivado Simulation
+
+Each subdirectory under `vivado_simulation/` is a self-contained source set (`example_top.v`, `sim_tb_top.v`, hex init files).
+
+1. Open Vivado and create or open a project.
+2. Add sources from the target subdirectory, e.g. `vivado_simulation/bert_layer/`.
+3. Set `sim_tb_top.v` as the simulation top module.
+4. Run **Simulation → Run Behavioral Simulation**.
+
+Available targets:
+
+| Directory | Description |
+|-----------|-------------|
+| `bert_layer` | BERT encoder layer benchmark |
+| `deit_layer` | DeiT (ViT) layer benchmark |
+| `mnist_layer` | MNIST MLP layer benchmark |
+| `output_stationary` | Output-stationary systolic array |
+| `weight_stationary` | Weight-stationary systolic array |
+| `os_pp` | Output-stationary with post-processing |
+| `ws_pp` | Weight-stationary with post-processing |
+| `rsa_ws` | Row-skipping adaptive array |
 
 ---
 
 ## Branches
 
-Development was split across several branches, each focused on a specific aspect of the project:
-
-| Branch                       | Purpose                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| `main`                       | Consolidated final state — RTL, verification, simulation, quantization, and selector |
-| `variant`                    | Exploration of systolic array variants experiments                                   |
-| `pingpong`                   | Ping-pong buffering extension for WS and OS designs                                  |
-| `layer_info`                 | Per-layer analysis results and selected layer weight bundles                         |
-| `result` / `result+selector` | Benchmark results, resource utilization data, and selector integration               |
+| Branch | Purpose |
+|--------|---------|
+| `main` | Consolidated final state — RTL, verification, simulation, quantization, and selector |
+| `variant` | Exploration of systolic array variants experiments |
+| `pingpong` | Ping-pong buffering extension for WS and OS designs |
+| `layer_info` | Per-layer analysis results and selected layer weight bundles |
+| `result` / `result+selector` | Benchmark results, resource utilization data, and selector integration |

@@ -1,16 +1,12 @@
-TOPLEVEL ?= matrix_top_wrapper
-MODULE ?= matrix_axi_wrapper_tb
+TOPLEVEL_LANG = verilog
 SIM ?= icarus
-SIM_BUILD ?= sim_build_$(TOPLEVEL)
-RESULTS_XML ?= matrix_wrapper_results.xml
-PYTHON ?= python
+COMPILE_ARGS += -g2012
 
-.PHONY: all sim clean
+# Default target for current matrix AXI-wrapper simulation
+TOPLEVEL ?= matrix_top_wrapper
+MODULE   ?= matrix_axi_wrapper_tb
 
-all: sim
-
-sim:
-	$(PYTHON) run_cocotb.py
-
-clean:
-	-$(PYTHON) -c "from pathlib import Path; import shutil; shutil.rmtree(Path('$(SIM_BUILD)'), ignore_errors=True); Path('$(RESULTS_XML)').unlink(missing_ok=True)"
+# Compile only matrix-related RTL for faster and cleaner sims.
+RTL_DIR := $(CURDIR)/../../rtl/os_pp
+VERILOG_SOURCES := $(shell find $(RTL_DIR) -type f \( -name "*.v" -o -name "*.sv" \) | sort)
+include $(shell cocotb-config --makefiles)/Makefile.sim
