@@ -72,13 +72,13 @@ We design and evaluate multiple systolic-array variants—including **Output-Sta
 
 ## Repository Structure
 
-| Folder | Contents |
-|--------|----------|
-| [`rtl/`](rtl/) | SystemVerilog/Verilog RTL source for six systolic array designs (`output_stationary`, `weight_stationary`, `os_pp`, `ws_pp`, `rsa_ws`, `smt_sa`). Each design shares the `matrix_top_wrapper` top-level interface. |
-| [`cocotb_verification/`](cocotb_verification/) | Python-based cocotb functional verification testbenches for each RTL design. Each subdirectory contains a testbench (`matrix_axi_wrapper_tb.py`), a `Makefile`, and a `TEST_CASES.md`. |
-| [`vivado_simulation/`](vivado_simulation/) | Vivado-compatible simulation files for the systolic array designs and neural network layer demos (BERT, DeiT, MNIST). Each subdirectory has a top-level wrapper, a testbench, and hex weight/data init files. |
-| [`quantization_analysis/`](quantization_analysis/) | PyTorch PTQ/QAT sweep, per-layer profiling, and weight export scripts. Covers ResNet18/50 and BERT-tiny; outputs sweep metrics, checkpoints, and per-layer JSON profiles. |
-| [`selector/`](selector/) | Automated systolic array selector and RTL generator. Given a workload shape, `systolic_selector/` ranks designs using benchmark CSVs, generates RTL, and produces comparison reports. |
+| Folder                                             | Contents                                                                                                                                                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`rtl/`](rtl/)                                     | SystemVerilog/Verilog RTL source for six systolic array designs (`output_stationary`, `weight_stationary`, `os_pp`, `ws_pp`, `rsa_ws`, `smt_sa`). Each design shares the `matrix_top_wrapper` top-level interface. |
+| [`cocotb_verification/`](cocotb_verification/)     | Python-based cocotb functional verification testbenches for each RTL design. Each subdirectory contains a testbench (`matrix_axi_wrapper_tb.py`), a `Makefile`, and a `TEST_CASES.md`.                             |
+| [`vivado_simulation/`](vivado_simulation/)         | Vivado-compatible simulation files for the systolic array designs and neural network layer demos (BERT, DeiT, MNIST). Each subdirectory has a top-level wrapper, a testbench, and hex weight/data init files.      |
+| [`quantization_analysis/`](quantization_analysis/) | PyTorch PTQ/QAT sweep, per-layer profiling, and weight export scripts. Covers ResNet18/50 and BERT-tiny; outputs sweep metrics, checkpoints, and per-layer JSON profiles.                                          |
+| [`selector/`](selector/)                           | Automated systolic array selector and RTL generator. Given a workload shape, `systolic_selector/` ranks designs using benchmark CSVs, generates RTL, and produces comparison reports.                              |
 
 ---
 
@@ -103,12 +103,12 @@ python main.py --M 64 --K 192 --N 10 --perf_w 0.8 --resource_w 0.2 --top_k 5
 
 Reports and generated RTL are written to `selector/reports/`:
 
-| Output | Path |
-|--------|------|
-| Markdown report | `reports/report_M{M}_K{K}_N{N}.md` |
-| Plain-text report | `reports/report_M{M}_K{K}_N{N}.txt` |
-| Trade-off scatter plot | `reports/plot_M{M}_K{K}_N{N}.png` |
-| Generated RTL | `reports/generated_rtl/rank{i}_{VARIANT}_dim{D}/` |
+| Output                 | Path                                              |
+| ---------------------- | ------------------------------------------------- |
+| Markdown report        | `reports/report_M{M}_K{K}_N{N}.md`                |
+| Plain-text report      | `reports/report_M{M}_K{K}_N{N}.txt`               |
+| Trade-off scatter plot | `reports/plot_M{M}_K{K}_N{N}.png`                 |
+| Generated RTL          | `reports/generated_rtl/rank{i}_{VARIANT}_dim{D}/` |
 
 ---
 
@@ -145,25 +145,25 @@ Each subdirectory under `vivado_simulation/` is a self-contained source set (`ex
 
 Available targets:
 
-| Directory | Description |
-|-----------|-------------|
-| `bert_layer` | BERT encoder layer benchmark |
-| `deit_layer` | DeiT (ViT) layer benchmark |
-| `mnist_layer` | MNIST MLP layer benchmark |
-| `output_stationary` | Output-stationary systolic array |
-| `weight_stationary` | Weight-stationary systolic array |
-| `os_pp` | Output-stationary with post-processing |
-| `ws_pp` | Weight-stationary with post-processing |
-| `rsa_ws` | Row-skipping adaptive array |
+| Directory           | Description                            |
+| ------------------- | -------------------------------------- |
+| `bert_layer`        | BERT encoder layer benchmark           |
+| `deit_layer`        | DeiT (ViT) layer benchmark             |
+| `mnist_layer`       | MNIST MLP layer benchmark              |
+| `output_stationary` | Output-stationary systolic array       |
+| `weight_stationary` | Weight-stationary systolic array       |
+| `os_pp`             | Output-stationary with post-processing |
+| `ws_pp`             | Weight-stationary with post-processing |
+| `rsa_ws`            | Row-skipping adaptive array            |
 
 ---
 
 ## Branches
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Consolidated final state — RTL, verification, simulation, quantization, and selector |
-| `variant` | Exploration of systolic array variants experiments |
-| `pingpong` | Ping-pong buffering extension for WS and OS designs |
-| `layer_info` | Per-layer analysis results and selected layer weight bundles |
-| `result` / `result+selector` | Benchmark results, resource utilization data, and selector integration |
+| Branch            | Purpose                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `main`            | Consolidated final state — RTL, verification, simulation, quantization, and selector |
+| `variant`         | Exploration of systolic array variants experiments                                   |
+| `pingpong`        | Ping-pong buffering extension for WS and OS designs                                  |
+| `layer_info`      | Per-layer analysis results and selected layer weight bundles                         |
+| `result+selector` | Benchmark results, resource utilization data, and selector integration               |
