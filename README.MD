@@ -1,5 +1,7 @@
 # ADLS Group 11: Design Space Exploration and Layer-Aware Mapping for Systolic Array Variants
 
+📄 **[Full Project Report](ADLS_Group_11_Report.pdf)**
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
